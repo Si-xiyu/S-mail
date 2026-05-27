@@ -1,5 +1,7 @@
 package com.smartmail.common.security;
 
+import com.smartmail.common.exception.BusinessException;
+
 public final class UserContext {
     private static final ThreadLocal<CurrentUser> HOLDER = new ThreadLocal<>();
 
@@ -17,7 +19,7 @@ public final class UserContext {
     public static Long requireUserId() {
         CurrentUser user = HOLDER.get();
         if (user == null) {
-            throw new IllegalStateException("未登录");
+            throw new BusinessException(401, "请先登录");
         }
         return user.id();
     }
