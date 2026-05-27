@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: smartmail-backend
+  datasource:
+    url: ${SMARTMAIL_DB_URL:jdbc:mysql://localhost:3306/smartmail?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SMARTMAIL_DB_USERNAME:root}
+    password: ${SMARTMAIL_DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+smartmail:
+  auth:
+    token-secret: ${SMARTMAIL_TOKEN_SECRET:smartmail-dev-secret-change-me}
+    token-ttl-seconds: 86400
+  internal-token: ${SMARTMAIL_INTERNAL_TOKEN:smartmail-internal-dev-token}
+  ai:
+    enabled: ${SMARTMAIL_AI_ENABLED:true}
+    agent-base-url: ${SMARTMAIL_AGENT_BASE_URL:http://localhost:8000}
+    timeout-seconds: 5
