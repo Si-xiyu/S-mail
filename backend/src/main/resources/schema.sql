@@ -1,0 +1,72 @@
+CREATE TABLE IF NOT EXISTS sys_user (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(128) NOT NULL UNIQUE,
+    username VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(128) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    message_no VARCHAR(64) NOT NULL UNIQUE,
+    sender_id BIGINT NOT NULL,
+    sender_email VARCHAR(128) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    content_text CLOB,
+    content_html CLOB,
+    has_attachment BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_recipient (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    mail_id BIGINT NOT NULL,
+    recipient_id BIGINT,
+    recipient_email VARCHAR(128) NOT NULL,
+    recipient_type VARCHAR(10) NOT NULL,
+    delivery_status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mailbox_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    mail_id BIGINT NOT NULL,
+    folder VARCHAR(20) NOT NULL,
+    read_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    star_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    priority VARCHAR(20) NOT NULL DEFAULT 'NORMAL',
+    received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_attachment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    mail_id BIGINT,
+    uploader_id BIGINT NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    storage_path VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(128),
+    file_size BIGINT NOT NULL DEFAULT 0,
+    sha256 VARCHAR(128),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_ai_result (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    mail_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    result_type VARCHAR(40) NOT NULL,
+    result_json CLOB NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_user_folder ON mailbox_item(user_id, folder, deleted_flag);
+CREATE INDEX IF NOT EXISTS idx_recipient_mail ON mail_recipient(mail_id);
+CREATE INDEX IF NOT EXISTS idx_ai_mail_user_type ON mail_ai_result(mail_id, user_id, result_type);
