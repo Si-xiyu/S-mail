@@ -25,6 +25,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Personal reports
+doc/周报/
+
 # Runtime storage
 storage/attachments/*
 !storage/attachments/.gitkeep
