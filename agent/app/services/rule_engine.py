@@ -4,13 +4,13 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from app.schemas.agent import AnalysisResponse, MailContext, ModelInfo
+from app.schemas.agent import AnalysisCategory, AnalysisResponse, MailContext, ModelInfo
 
 
 @dataclass(frozen=True)
 class AnalysisResult:
     summary: list[str]
-    category: str
+    category: AnalysisCategory | str
     junk: bool
     priority: str
     priority_score: int
@@ -98,7 +98,7 @@ class RuleEngine:
         )
         return {
             "priority": result.priority,
-            "labels": [result.category],
+            "labels": [self._category_name(result.category)],
             "spam": result.junk,
             "riskHints": result.risk_hints,
             "summary": result.summary,
@@ -118,10 +118,10 @@ class RuleEngine:
     ) -> AnalysisResult:
         text = f"{subject}\n{content}".strip()
         lower_text = text.lower()
-        category_names = self._category_names(user_categories)
+        categories = self._category_options(user_categories)
         risk_hints = self._risk_hints(lower_text, sender)
         junk = self._is_junk(lower_text, behavior_signals)
-        category = self._choose_category(lower_text, category_names, junk)
+        category = self._choose_category(lower_text, categories, junk)
         score = self._priority_score(lower_text, behavior_signals, junk)
         return AnalysisResult(
             summary=self._summary(subject, content),
@@ -196,34 +196,37 @@ class RuleEngine:
             if any(word in sentence.lower() for word in action_words)
         ][:5]
 
-    def _category_names(self, user_categories: list[Any]) -> list[str]:
-        names: list[str] = []
+    def _category_options(self, user_categories: list[Any]) -> list[AnalysisCategory]:
+        categories: list[AnalysisCategory] = []
         for category in user_categories:
             if isinstance(category, str):
                 name = category.strip()
+                category_id = None
             elif isinstance(category, dict):
                 raw = category.get("name") or category.get("label") or category.get("category")
                 name = str(raw).strip() if raw is not None else ""
+                category_id = category.get("id")
             else:
                 name = str(category).strip()
+                category_id = None
             if name:
-                names.append(name)
-        return names
+                categories.append(AnalysisCategory(id=category_id, name=name))
+        return categories
 
-    def _choose_category(self, text: str, categories: list[str], junk: bool) -> str:
+    def _choose_category(self, text: str, categories: list[AnalysisCategory], junk: bool) -> AnalysisCategory:
         if junk:
-            junk_category = self._find_category(categories, ("junk", "spam"))
+            junk_category = self._find_category(categories, ("junk",)) or self._find_category(categories, ("spam",))
             if junk_category:
                 return junk_category
         for category in categories:
-            words = [part for part in re.split(r"[\s_\-/]+", category.lower()) if len(part) >= 3]
+            words = [part for part in re.split(r"[\s_\-/]+", category.name.lower()) if len(part) >= 3]
             if words and any(word in text for word in words):
                 return category
         if self._find_terms(text, self.meeting_words):
-            return self._find_category(categories, ("meeting", "calendar", "work")) or "Other"
+            return self._find_category(categories, ("meeting", "calendar", "work")) or self._default_category(categories)
         if self._find_terms(text, self.work_words):
-            return self._find_category(categories, ("work", "project", "business")) or "Other"
-        return "Other"
+            return self._find_category(categories, ("work", "project", "business")) or self._default_category(categories)
+        return self._default_category(categories)
 
     def _is_junk(self, text: str, behavior_signals: dict[str, Any]) -> bool:
         spam_hits = sum(1 for word in self.spam_words if word in text)
@@ -299,12 +302,22 @@ class RuleEngine:
     def _find_terms(self, text: str, terms: tuple[str, ...]) -> bool:
         return any(term in text for term in terms)
 
-    def _find_category(self, categories: list[str], terms: tuple[str, ...]) -> str | None:
+    def _find_category(
+        self, categories: list[AnalysisCategory], terms: tuple[str, ...]
+    ) -> AnalysisCategory | None:
         for category in categories:
-            lower_category = category.lower()
+            lower_category = category.name.lower()
             if any(term in lower_category for term in terms):
                 return category
         return None
+
+    def _default_category(self, categories: list[AnalysisCategory]) -> AnalysisCategory:
+        return self._find_category(categories, ("other",)) or AnalysisCategory(name="Other")
+
+    def _category_name(self, category: AnalysisCategory | str) -> str:
+        if isinstance(category, AnalysisCategory):
+            return category.name
+        return category
 
     def _truthy_signal(self, signals: dict[str, Any], *names: str) -> bool:
         return any(bool(signals.get(name)) for name in names)
