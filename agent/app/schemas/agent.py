@@ -108,14 +108,20 @@ class ModelInfo(BaseModel):
     mode: str
     llm_enabled: bool = Field(alias="llmEnabled")
     rag_tool: str = Field(alias="ragTool")
+    fallback_used: bool = Field(default=True, alias="fallbackUsed")
 
     model_config = {"populate_by_name": True}
+
+
+class AnalysisCategory(BaseModel):
+    id: int | str | None = None
+    name: str
 
 
 class AnalysisResponse(BaseModel):
     status: AnalysisStatus
     summary: list[str]
-    category: str | None
+    category: AnalysisCategory | str | None
     junk: bool
     priority: Priority | None
     priority_score: int = Field(alias="priorityScore")
