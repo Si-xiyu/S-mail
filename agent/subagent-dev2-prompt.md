@@ -1,93 +1,101 @@
-# Subagent Prompt: agent/dev2 Round 2
+# Subagent Prompt: agent/dev2 Round 3
 
 You are working in worktree `E:\Code\Smail-worktree\dev2` on branch `agent/dev2`.
 
-Before coding, sync your branch with `agent/main` from the main repository if needed. You are not alone in the codebase: another worker is editing `agent/dev1`, and the merge owner will integrate both. Do not revert unrelated changes. Work only under `agent/`.
+Before coding, sync your branch with `agent/main` from the main repository if needed. Another worker is editing `agent/dev1`, and the merge owner will integrate both. Do not revert unrelated changes. Work only under `agent/`.
 
 ## Goal
 
-Harden the interactive Agent Plugin contract after Round 1.
+Add the missing Agent-side API contract for executing a write action after the user confirms it.
 
-Round 1 implemented:
-
-- `POST /plugin/v1/agent/chat`
-- ToolRouter
-- current-mail context tool
-- mock RAG tool
-- pending write actions
-
-Round 2 focus: make chat responses and backend internal-tool boundaries easier for backend/frontend integration.
+Round 2 made `POST /plugin/v1/agent/chat` return `pendingActions[]` for write intents. Round 3 should expose an API that frontend/backend can call after user confirmation, while still keeping the Agent decoupled from real backend writes.
 
 ## Required Changes
 
-### 1. Pending Action Shape
+### 1. Add Confirmed Action Execution API
 
-Update pending actions to include integration-friendly fields:
+Add a new plugin endpoint, suggested shape:
+
+```http
+POST /plugin/v1/agent/actions/execute
+```
+
+Suggested request:
 
 ```json
 {
-  "actionId": "local-generated-id-or-null",
+  "actionId": "s1:88:SET_PRIORITY",
+  "userId": 1,
+  "confirmed": true,
   "type": "SET_PRIORITY",
-  "label": "标记为 HIGH",
-  "payload": { "mailItemId": 88, "priority": "HIGH" },
-  "reason": "user confirmation is required",
-  "status": "PENDING",
-  "execution": "BACKEND_REQUIRED"
+  "payload": {
+    "mailItemId": 88,
+    "priority": "HIGH"
+  },
+  "pluginConfig": {
+    "aiPluginEnabled": true
+  },
+  "toolPolicy": {
+    "agentAutoWriteEnabled": false
+  }
 }
 ```
 
+Suggested response:
+
+```json
+{
+  "status": "DELEGATED",
+  "actionId": "s1:88:SET_PRIORITY",
+  "execution": "BACKEND_REQUIRED",
+  "backendOperation": {
+    "method": "POST",
+    "path": "/internal/v1/tools/mail-actions/execute",
+    "payload": {
+      "mailItemId": 88,
+      "priority": "HIGH"
+    }
+  },
+  "message": "Action confirmed; backend execution is required."
+}
+```
+
+The exact schema can differ if there is a cleaner local pattern, but it must express:
+
+- disabled plugin -> no operation
+- not confirmed -> rejected/no operation
+- confirmed -> delegated backend operation envelope
+- no local mail state mutation in Agent
+
+### 2. Preserve Permission Model
+
 Rules:
 
-- `actionId` may be a deterministic local ID for now.
-- `label` should be user-facing and concise.
-- Prefer `mailItemId` over `mailId` for new plugin flow.
-- Keep compatibility with context containing `mailId` by mapping it into `mailItemId` if no `mailItemId` exists.
-- Top-level chat status remains `SUCCEEDED` when pending actions are produced.
+- Default Agent write behavior remains user-confirmation-first.
+- If `agentAutoWriteEnabled=true`, the same execute endpoint may return a delegated backend operation without requiring `confirmed=true`, but it must still not mutate local state.
+- Unsupported action types return a clear failed/rejected response.
+- Use `mailItemId` in new payloads; accept legacy `mailId`.
 
-### 2. Backend Internal Tool API Path
+### 3. Tests
 
-Update current-mail context retrieval to prefer the documented new API:
+Add endpoint-level tests for:
 
-```http
-GET /internal/v1/tools/mail-items/{itemId}/context
-```
+- disabled plugin returns `DISABLED` or equivalent no-op status.
+- `confirmed=false` and `agentAutoWriteEnabled=false` rejects the operation.
+- `confirmed=true` delegates backend operation with `BACKEND_REQUIRED`.
+- `agentAutoWriteEnabled=true` delegates without confirmation.
+- legacy `mailId` is normalized to `mailItemId`.
+- unsupported type is rejected.
 
-Fallback to the old endpoint only if needed for current prototype compatibility:
-
-```http
-GET /internal/v1/tools/mails/{mailId}?userId=...
-```
-
-Do not remove old compatibility yet.
-
-### 3. Endpoint-Level Tests
-
-Add tests using FastAPI `TestClient` for:
-
-- `POST /plugin/v1/agent/chat` disabled plugin.
-- current-mail chat returns `SUCCEEDED`.
-- global chat uses mock RAG.
-- write intent returns `pendingActions` with `actionId`, `label`, `mailItemId`, and status `PENDING`.
-
-Keep existing service-level tests if useful.
-
-### 4. Contract Consistency
-
-Ensure status values match the documented plugin contract:
-
-- `SUCCEEDED`
-- `FAILED`
-- `DISABLED`
-- `PARTIAL`
-
-Do not reintroduce `SUCCESS` or `NEEDS_ACTION` as top-level response statuses.
+Keep status names internally consistent and document them in code/schema names if useful.
 
 ## Constraints
 
-- Do not modify automatic-analysis rule behavior unless needed for shared schema compatibility.
 - Do not modify frontend/backend.
-- Do not access DB.
-- Preserve legacy `POST /api/v1/agent/tasks`.
+- Do not perform real backend writes.
+- Do not implement real auth or DB persistence.
+- Do not change automatic-analysis rule behavior.
+- Preserve `POST /api/v1/agent/tasks`.
 - RAG remains mock.
 
 ## Verification
@@ -106,7 +114,7 @@ E:\software\Miniconda\python.exe -B -m unittest discover -s tests
 Report:
 
 - changed files
-- contract changes
+- API/schema changes
 - test results
 - assumptions for merge owner
 
