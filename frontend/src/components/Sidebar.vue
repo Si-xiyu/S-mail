@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 
 const mailStore = useMailStore()
+
+const isCollapsed = ref(false)
+
+const handleResize = () => {
+  isCollapsed.value = window.innerWidth < 1200
+}
+
+onMounted(() => {
+  handleResize()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 const mainLabels = computed(() => {
   return mailStore.labels.filter(l => ['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
@@ -42,14 +57,14 @@ const getLabelIcon = (labelId: string) => {
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ collapsed: isCollapsed }">
     <div class="compose-btn-container">
-      <button class="compose-btn" @click="handleComposeClick">
+      <button class="compose-btn" @click="handleComposeClick" :title="isCollapsed ? 'Compose' : ''">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-        Compose
+        <span v-if="!isCollapsed">Compose</span>
       </button>
     </div>
 
@@ -60,28 +75,30 @@ const getLabelIcon = (labelId: string) => {
           :key="label.id"
           class="label-item"
           :class="{ active: isActive(label.id) }"
+          :title="isCollapsed ? label.name : ''"
           @click="selectLabel(label.id)"
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
-          <span class="label-name">{{ label.name }}</span>
-          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <span v-if="!isCollapsed" class="label-name">{{ label.name }}</span>
+          <span v-if="!isCollapsed && label.count > 0" class="label-count">{{ label.count }}</span>
         </button>
       </div>
 
       <div class="labels-divider"></div>
 
       <div class="labels-group">
-        <div class="section-title">More</div>
+        <div v-if="!isCollapsed" class="section-title">More</div>
         <button
           v-for="label in otherLabels"
           :key="label.id"
           class="label-item"
           :class="{ active: isActive(label.id) }"
+          :title="isCollapsed ? label.name : ''"
           @click="selectLabel(label.id)"
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
-          <span class="label-name">{{ label.name }}</span>
-          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <span v-if="!isCollapsed" class="label-name">{{ label.name }}</span>
+          <span v-if="!isCollapsed && label.count > 0" class="label-count">{{ label.count }}</span>
         </button>
       </div>
     </nav>
@@ -112,10 +129,21 @@ const getLabelIcon = (labelId: string) => {
   flex-direction: column;
   padding: 16px 0;
   overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 80px;
+  padding: 12px 0;
 }
 
 .compose-btn-container {
   padding: 0 16px 16px;
+  transition: padding 0.3s ease;
+}
+
+.sidebar.collapsed .compose-btn-container {
+  padding: 0 8px 12px;
 }
 
 .compose-btn {
@@ -134,6 +162,13 @@ const getLabelIcon = (labelId: string) => {
   gap: 8px;
   transition: all 0.2s;
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.sidebar.collapsed .compose-btn {
+  padding: 10px;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
 }
 
 .compose-btn:hover {
@@ -176,6 +211,14 @@ const getLabelIcon = (labelId: string) => {
   color: #374151;
   font-size: 14px;
   transition: all 0.2s;
+  width: 100%;
+}
+
+.sidebar.collapsed .label-item {
+  justify-content: center;
+  padding: 8px;
+  gap: 0;
+  border-radius: 8px;
 }
 
 .label-item:hover {
@@ -225,6 +268,13 @@ const getLabelIcon = (labelId: string) => {
   gap: 8px;
   padding: 16px;
   border-top: 1px solid #e5e7eb;
+  transition: padding 0.3s ease;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  flex-direction: column;
+  padding: 8px;
+  gap: 4px;
 }
 
 .settings-btn,
@@ -240,6 +290,11 @@ const getLabelIcon = (labelId: string) => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+}
+
+.sidebar.collapsed .settings-btn,
+.sidebar.collapsed .help-btn {
+  padding: 6px;
 }
 
 .settings-btn:hover,

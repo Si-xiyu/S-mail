@@ -107,8 +107,9 @@ const formatTime = (timestamp: number) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  flex: 1;
   background: white;
-  border-right: 1px solid #e5e7eb;
+  min-width: 0;
 }
 
 .list-header {
