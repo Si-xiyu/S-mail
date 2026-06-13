@@ -1,165 +1,113 @@
-# Subagent Prompt: agent/dev2
+# Subagent Prompt: agent/dev2 Round 2
 
-You are working in worktree `E:\Code\Smail-worktree` on branch `agent/dev2`.
+You are working in worktree `E:\Code\Smail-worktree\dev2` on branch `agent/dev2`.
 
-Your scope is **only the `agent/` service** unless you need to read docs for context. Do not modify frontend or backend code. If you need temporary notes, place them under `agent/`.
+Before coding, sync your branch with `agent/main` from the main repository if needed. You are not alone in the codebase: another worker is editing `agent/dev1`, and the merge owner will integrate both. Do not revert unrelated changes. Work only under `agent/`.
 
 ## Goal
 
-Implement the interactive Agent Plugin side of SmartMail according to:
+Harden the interactive Agent Plugin contract after Round 1.
 
-- `docs/api/agent-plugin-api.md`
-- `docs/api/mvp-api.md`
-- `docs/design/mvp-architecture.md`
-- `CONTEXT.md`
+Round 1 implemented:
 
-This branch should focus on:
+- `POST /plugin/v1/agent/chat`
+- ToolRouter
+- current-mail context tool
+- mock RAG tool
+- pending write actions
 
-- current-mail chat endpoint
-- global-agent chat endpoint behavior through the same API
-- tool-router structure
-- mock RAG Tool boundary
-- pending write actions instead of direct writes
+Round 2 focus: make chat responses and backend internal-tool boundaries easier for backend/frontend integration.
 
-Do not implement automatic mail analysis in this branch except where shared schemas are needed. Avoid conflicting with `agent/dev1`.
+## Required Changes
 
-## Required Behavior
+### 1. Pending Action Shape
 
-Implement or refactor the Agent service so it exposes:
-
-```http
-POST /plugin/v1/agent/chat
-```
-
-The endpoint must accept the documented request shape:
-
-- `sessionId`
-- `userId`
-- `scope`: `CURRENT_MAIL` or `GLOBAL`
-- `message`
-- `context`
-- `toolPolicy`
-- `pluginConfig`
-
-It must return:
-
-- `status`
-- `answer`
-- `toolCalls`
-- `pendingActions`
-
-## Tool Router Requirements
-
-Build a small, explicit tool-router layer with these conceptual tools:
-
-1. `mail_context_tool`
-   - For `CURRENT_MAIL`.
-   - Calls backend Internal Tool API if enough context is provided, or returns a structured fallback when backend is unavailable and mock is enabled.
-   - Must not access database directly.
-
-2. `rag_tool`
-   - For `GLOBAL`.
-   - MVP implementation may be mock.
-   - Preserve the boundary for future BM25 + vector + RRF implementation.
-   - Response should identify `source: "MOCK"` for mock records.
-
-3. `mail_action_tool`
-   - Does not directly execute writes in this branch.
-   - Produces `pendingActions` for actions such as:
-     - `SET_PRIORITY`
-     - `SET_CATEGORY`
-     - `MOVE_TO_JUNK`
-     - `MARK_READ`
-   - If `agentAutoWriteEnabled=false`, always return pending actions.
-   - If `agentAutoWriteEnabled=true`, still only allow whitelisted actions and clearly mark whether execution is delegated to backend. Do not mutate data locally.
-
-## Chat Behavior
-
-For `CURRENT_MAIL`:
-
-- Use current mail context as the primary context.
-- Answer questions like:
-  - “这封邮件需要我做什么？”
-  - “帮我生成回复思路。”
-  - “这封邮件安全吗？”
-- If the user asks to modify mail state, return a pending action rather than pretending it was done.
-
-For `GLOBAL`:
-
-- Route retrieval-like questions to `rag_tool`.
-- Since MVP RAG is mock, return a useful answer that states it is based on available/mock retrieval context.
-- Do not claim full mailbox retrieval is implemented.
-
-Plugin disabled behavior:
-
-- If `pluginConfig.aiPluginEnabled=false`, return:
+Update pending actions to include integration-friendly fields:
 
 ```json
 {
-  "status": "DISABLED",
-  "message": "AI Plugin is disabled"
+  "actionId": "local-generated-id-or-null",
+  "type": "SET_PRIORITY",
+  "label": "标记为 HIGH",
+  "payload": { "mailItemId": 88, "priority": "HIGH" },
+  "reason": "user confirmation is required",
+  "status": "PENDING",
+  "execution": "BACKEND_REQUIRED"
 }
 ```
 
-Use the documented schema shape consistently; if you include `message`, also keep the API predictable for backend integration.
+Rules:
 
-## Implementation Constraints
+- `actionId` may be a deterministic local ID for now.
+- `label` should be user-facing and concise.
+- Prefer `mailItemId` over `mailId` for new plugin flow.
+- Keep compatibility with context containing `mailId` by mapping it into `mailItemId` if no `mailItemId` exists.
+- Top-level chat status remains `SUCCEEDED` when pending actions are produced.
 
-- Preserve frontend/backend decoupling: frontend never calls Agent directly.
-- Agent must not access database.
-- Backend Internal Tool API calls must use configured base URL and internal token.
-- Avoid heavy LangChain dependency unless already present. A small in-project router is enough for MVP.
-- Keep mock behavior explicit and deterministic.
-- Avoid changing endpoint behavior for automatic analysis; that is `agent/dev1`.
+### 2. Backend Internal Tool API Path
 
-## Suggested File Areas
+Update current-mail context retrieval to prefer the documented new API:
 
-Likely files to inspect/edit:
+```http
+GET /internal/v1/tools/mail-items/{itemId}/context
+```
 
-- `agent/app/main.py`
-- `agent/app/api/routes.py`
-- `agent/app/schemas/agent.py`
-- `agent/app/tools/backend_tools.py`
-- `agent/app/services/agent_loop.py`
-- `agent/app/core/config.py`
-- `agent/tests/`
+Fallback to the old endpoint only if needed for current prototype compatibility:
 
-You may add new files under:
+```http
+GET /internal/v1/tools/mails/{mailId}?userId=...
+```
 
-- `agent/app/services/tool_router.py`
-- `agent/app/services/rag_tool.py`
-- `agent/app/schemas/plugin.py`
+Do not remove old compatibility yet.
 
-Coordinate names carefully so merge conflicts with `agent/dev1` are easy to resolve.
+### 3. Endpoint-Level Tests
 
-## Tests / Verification
+Add tests using FastAPI `TestClient` for:
 
-Add focused tests if test infrastructure is present. At minimum verify:
+- `POST /plugin/v1/agent/chat` disabled plugin.
+- current-mail chat returns `SUCCEEDED`.
+- global chat uses mock RAG.
+- write intent returns `pendingActions` with `actionId`, `label`, `mailItemId`, and status `PENDING`.
 
-- disabled plugin returns `DISABLED`.
-- current-mail chat returns an answer and uses `mail_context_tool`.
-- global chat uses `rag_tool` and marks mock source.
-- write-intent message returns `pendingActions`.
-- no tool directly mutates local data.
+Keep existing service-level tests if useful.
 
-Run the lightest available verification, for example:
+### 4. Contract Consistency
+
+Ensure status values match the documented plugin contract:
+
+- `SUCCEEDED`
+- `FAILED`
+- `DISABLED`
+- `PARTIAL`
+
+Do not reintroduce `SUCCESS` or `NEEDS_ACTION` as top-level response statuses.
+
+## Constraints
+
+- Do not modify automatic-analysis rule behavior unless needed for shared schema compatibility.
+- Do not modify frontend/backend.
+- Do not access DB.
+- Preserve legacy `POST /api/v1/agent/tasks`.
+- RAG remains mock.
+
+## Verification
+
+Run:
 
 ```powershell
 cd agent
-python -m compileall app
+$env:PYTHONPYCACHEPREFIX=$env:TEMP
+E:\software\Miniconda\python.exe -m compileall app
+E:\software\Miniconda\python.exe -B -m unittest discover -s tests
 ```
 
-If adding tests, document how to run them.
+## Final Response
 
-## Deliverable
-
-At the end, report:
+Report:
 
 - changed files
-- implemented endpoint behavior
-- example current-mail chat response
-- example global chat response
-- verification command and result
-- any assumptions for the merge owner
+- contract changes
+- test results
+- assumptions for merge owner
 
-Do not merge branches yourself. The merge owner will merge `agent/dev2`.
+Do not merge branches yourself.

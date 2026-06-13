@@ -1,134 +1,110 @@
-# Subagent Prompt: agent/dev1
+# Subagent Prompt: agent/dev1 Round 2
 
-You are working in worktree `E:\Code\Smail-worktree` on branch `agent/dev1`.
+You are working in worktree `E:\Code\Smail-worktree\dev1` on branch `agent/dev1`.
 
-Your scope is **only the `agent/` service** unless you need to read docs for context. Do not modify frontend or backend code. If you need temporary notes, place them under `agent/`.
+Before coding, sync your branch with `agent/main` from the main repository if needed. You are not alone in the codebase: another worker is editing `agent/dev2`, and the merge owner will integrate both. Do not revert unrelated changes. Work only under `agent/`.
 
 ## Goal
 
-Implement the Agent Plugin automatic-analysis side of SmartMail according to the API contract in:
+Harden the automatic-analysis Agent Plugin contract after Round 1.
 
-- `docs/api/agent-plugin-api.md`
-- `docs/design/course-alignment.md`
-- `docs/design/mvp-architecture.md`
-- `CONTEXT.md`
+Round 1 implemented:
 
-The result should let the backend call the Agent Plugin as a decoupled service for:
+- `GET /plugin/v1/health`
+- `POST /plugin/v1/analysis/mail`
+- deterministic rules fallback
 
-- health check
-- automatic mail analysis
-- rules fallback when LLM is disabled or unavailable
+Round 2 focus: make automatic-analysis responses match the documented API contract more closely and improve provider/config boundaries without implementing real network LLM calls.
 
-Do not implement DeepSeek, Ollama, vector search, or real RAG in this branch. Keep provider boundaries clear so later work can plug them in.
+## Required Changes
 
-## Required Behavior
+### 1. Structured Category Response
 
-Implement or refactor the Agent service so it exposes:
+Current analysis may return `category` as a string. Update it to return a structured object when possible:
 
-```http
-GET  /plugin/v1/health
-POST /plugin/v1/analysis/mail
+```json
+{
+  "category": {
+    "id": 1,
+    "name": "课程"
+  }
+}
 ```
 
-The analysis endpoint must accept the request shape documented in `docs/api/agent-plugin-api.md` and return:
+Rules:
 
-- `status`
-- `summary`
-- `category`
-- `junk`
-- `priority`
-- `priorityScore`
-- `riskLevel`
-- `riskHints`
-- `modelInfo`
+- If `userCategories` contains objects with `id` and `name`, preserve both.
+- If `userCategories` contains strings, return at least `{ "name": "..." }`.
+- If no match, return `Other` if available.
+- If junk, return `Junk Mail` if available.
+- Disabled plugin may return `category: null`.
 
-It must support these plugin states:
+Keep backward-compatible parsing for existing string and dict category inputs.
 
-- AI plugin disabled: return `DISABLED` without attempting analysis.
-- LLM disabled / no API key: use deterministic rules fallback.
-- Rules analysis succeeds: return `SUCCEEDED`.
-- Partial failures: return `PARTIAL` where appropriate.
+### 2. Analysis Model Info / Provider Boundary
 
-## Rules Fallback Requirements
+Create a small provider boundary for analysis, but keep it local and deterministic:
 
-The rules fallback should cover course-aligned intelligent functions:
+- `RulesAnalysisProvider` or similarly named class can wrap current rule engine.
+- `provider` in `modelInfo` should reflect config:
+  - `RULES` when `llmEnabled=false`
+  - `DEEPSEEK` only if config says LLM enabled and API key exists, but still return rules fallback with `mode: "rules-fallback"` until real LLM is implemented.
+- Do not make network calls.
+- Clearly expose `fallbackUsed: true` if useful.
 
-- Summary: derive 1-3 short bullet points from subject/content.
-- Category: choose from `userCategories`; if no match, return `Other`; if junk, return `Junk Mail` if present.
-- Junk detection: suspicious words, phishing-like phrases, repeated promotion words, obvious spam patterns.
-- Priority prediction: combine content signals and `behaviorSignals`.
-- Security risk hints:
-  - URL present in body.
-  - suspicious sender wording/domain mismatch signals if available.
-  - words about prizes, loans, transfers, passwords, verification codes, urgent click requests.
+### 3. Risk / Priority Contract Cleanup
 
-Priority scoring guideline:
+Keep risk levels within:
 
-- `LOW`: 0-39
-- `NORMAL`: 40-69
-- `HIGH`: 70-89
-- `URGENT`: 90-100
+- `LOW`
+- `MEDIUM`
+- `HIGH`
 
-Behavior signals should influence score:
+No `CRITICAL`.
 
-- frequent/replied sender increases score.
-- recently marked junk sender decreases score and may increase junk confidence.
+Keep priority within:
 
-## Implementation Constraints
+- `LOW`
+- `NORMAL`
+- `HIGH`
+- `URGENT`
 
-- Preserve existing service shape where reasonable, but refactor if needed.
-- Keep schemas explicit with Pydantic models.
-- Avoid hardcoding Chinese-only logic; include mixed Chinese/English keywords where useful.
-- Do not let Agent access a database.
-- Do not call backend Internal Tool APIs from automatic analysis unless the documented request already contains enough context. The backend is expected to pass the context for this endpoint.
-- Do not silently swallow invalid input; return meaningful validation errors through FastAPI/Pydantic.
-- Keep output deterministic for tests.
+### 4. Tests
 
-## Suggested File Areas
+Update/add tests under `agent/tests/`:
 
-Likely files to inspect/edit:
+- category object input preserves id/name.
+- string category input still works.
+- junk maps to Junk Mail object.
+- disabled plugin returns category `null`.
+- modelInfo reports fallback mode.
 
-- `agent/app/main.py`
-- `agent/app/api/routes.py`
-- `agent/app/schemas/agent.py`
-- `agent/app/services/rule_engine.py`
-- `agent/app/services/agent_loop.py`
-- `agent/app/core/config.py`
-- `agent/tests/`
+## Constraints
 
-You may add new files under:
+- Do not modify interactive chat/tool router files unless absolutely necessary.
+- Do not modify frontend/backend.
+- Do not access DB.
+- Preserve `POST /api/v1/agent/tasks`.
+- Use deterministic rules only.
 
-- `agent/app/schemas/`
-- `agent/app/services/`
-- `agent/app/api/`
+## Verification
 
-## Tests / Verification
-
-Add focused tests if test infrastructure is present. At minimum verify:
-
-- health endpoint returns capabilities.
-- analysis returns `DISABLED` when `aiPluginEnabled=false`.
-- analysis returns summary/category/junk/priority/risk fields for a normal course-related email.
-- spam email maps to `Junk Mail` where available.
-- behavior signals influence priority.
-
-Run the lightest available verification, for example:
+Run:
 
 ```powershell
 cd agent
-python -m compileall app
+$env:PYTHONPYCACHEPREFIX=$env:TEMP
+E:\software\Miniconda\python.exe -m compileall app
+E:\software\Miniconda\python.exe -B -m unittest discover -s tests
 ```
 
-If adding tests, document how to run them.
+## Final Response
 
-## Deliverable
-
-At the end, report:
+Report:
 
 - changed files
-- implemented endpoints
-- example request/response
-- verification command and result
-- any assumptions for the merge owner
+- contract changes
+- test results
+- assumptions for merge owner
 
-Do not merge branches yourself. The merge owner will merge `agent/dev1`.
+Do not merge branches yourself.
