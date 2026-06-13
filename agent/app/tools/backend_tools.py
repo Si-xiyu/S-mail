@@ -63,22 +63,37 @@ class BackendToolClient:
             return ToolResult(ok=False, error=str(exc))
 
     def get_current_mail_context(self, context: dict[str, Any], user_id: int | str) -> ToolResult:
-        mail_id = context.get("mailId") or context.get("mail_id") or context.get("id")
-        if mail_id is None:
+        mail_item_id = _first_present(context, "mailItemId", "mail_item_id", "mailId", "mail_id", "id")
+        if mail_item_id is None:
             if not settings.mock_on_tool_error:
-                return ToolResult(ok=False, error="CURRENT_MAIL context must include mailId")
+                return ToolResult(ok=False, error="CURRENT_MAIL context must include mailItemId or mailId")
             return ToolResult(
                 ok=True,
                 data={
-                    **self._mock_mail(0, _coerce_user_id(user_id), "missing mailId in plugin context"),
+                    **self._mock_mail(0, _coerce_user_id(user_id), "missing mailItemId/mailId in plugin context"),
                     "source": "MOCK",
                 },
             )
 
-        result = self.get_mail(_coerce_int(mail_id), _coerce_user_id(user_id))
+        result = self._get_mail_item_context(_coerce_int(mail_item_id))
+        if not result.ok or result.data is None:
+            result = self.get_mail(_coerce_int(mail_item_id), _coerce_user_id(user_id))
         if result.ok and result.data is not None:
             result.data.setdefault("source", "BACKEND")
         return result
+
+    def _get_mail_item_context(self, mail_item_id: int) -> ToolResult:
+        try:
+            response = httpx.get(
+                f"{self.base_url}/internal/v1/tools/mail-items/{mail_item_id}/context",
+                headers=self.headers,
+                timeout=settings.timeout_seconds,
+            )
+            response.raise_for_status()
+            payload = response.json()["data"]
+            return ToolResult(ok=True, data=payload)
+        except Exception as exc:
+            return ToolResult(ok=False, error=str(exc))
 
     def _mock_mail(self, mail_id: int, user_id: int, reason: str) -> dict[str, Any]:
         return {
@@ -96,7 +111,7 @@ class BackendToolClient:
 
 def to_mail_context(data: dict[str, Any]) -> MailContext:
     return MailContext(
-        mail_id=_first_present(data, "mailId", "mail_id"),
+        mail_id=_first_present(data, "mailItemId", "mail_item_id", "mailId", "mail_id"),
         user_id=_first_present(data, "userId", "user_id"),
         sender_email=_first_present(data, "senderEmail", "sender_email"),
         subject=data.get("subject", ""),
