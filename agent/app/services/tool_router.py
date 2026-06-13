@@ -7,11 +7,11 @@ from app.services.rag_tool import RagTool
 from app.tools.backend_tools import BackendToolClient, to_mail_context
 
 
-ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any]]] = {
-    "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}),
-    "MARK_READ": ("MARK_READ", {"read": True}),
-    "SET_PRIORITY": ("SET_PRIORITY", {"priority": "HIGH"}),
-    "SET_CATEGORY": ("SET_CATEGORY", {"category": "FOLLOW_UP"}),
+ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any], str]] = {
+    "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}, "Move to junk"),
+    "MARK_READ": ("MARK_READ", {"read": True}, "Mark as read"),
+    "SET_PRIORITY": ("SET_PRIORITY", {"priority": "HIGH"}, "Set priority: HIGH"),
+    "SET_CATEGORY": ("SET_CATEGORY", {"category": "FOLLOW_UP"}, "Set category: FOLLOW_UP"),
 }
 
 
@@ -81,29 +81,30 @@ class ToolRouter:
         return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
 
     def _mail_action_tool(self, request: PluginChatRequest) -> list[PendingAction]:
-        action_type, payload = _detect_action(request.message)
+        action_type, payload, label = _detect_action(request.message)
         if action_type is None:
             return []
 
         auto_write = _auto_write_enabled(request.tool_policy)
-        status = "BACKEND_DELEGATION_PREPARED" if auto_write else "PENDING"
         reason = (
             "agentAutoWriteEnabled=true and action is whitelisted; backend delegation required."
             if auto_write
             else "agentAutoWriteEnabled=false; user confirmation is required."
         )
-        mail_id = request.context.get("mailId") or request.context.get("mail_id")
+        mail_item_id = _mail_item_id_from_context(request.context)
         full_payload = {**payload}
-        if mail_id is not None:
-            full_payload["mailId"] = mail_id
+        if mail_item_id is not None:
+            full_payload["mailItemId"] = mail_item_id
         full_payload["userId"] = request.user_id
         return [
             PendingAction(
+                actionId=_action_id(request.session_id, action_type, mail_item_id),
                 type=action_type,
+                label=label,
                 payload=full_payload,
                 reason=reason,
-                status=status,
-                execution="BACKEND_DELEGATION_ONLY",
+                status="PENDING",
+                execution="BACKEND_REQUIRED",
             )
         ]
 
@@ -119,7 +120,7 @@ def _auto_write_enabled(tool_policy: dict[str, Any]) -> bool:
     return bool(tool_policy.get("agentAutoWriteEnabled", False))
 
 
-def _detect_action(message: str) -> tuple[Any, dict[str, Any]]:
+def _detect_action(message: str) -> tuple[Any, dict[str, Any], str | None]:
     text = message.lower()
     if any(word in text for word in ("垃圾", "junk", "spam")) and any(word in text for word in ("移", "move", "标为", "mark")):
         return ACTION_KEYWORDS["MOVE_TO_JUNK"]
@@ -129,7 +130,16 @@ def _detect_action(message: str) -> tuple[Any, dict[str, Any]]:
         return ACTION_KEYWORDS["SET_PRIORITY"]
     if any(word in text for word in ("分类", "category", "标签", "label")) and any(word in text for word in ("设", "set", "标", "mark", "加", "add")):
         return ACTION_KEYWORDS["SET_CATEGORY"]
-    return None, {}
+    return None, {}, None
+
+
+def _mail_item_id_from_context(context: dict[str, Any]) -> Any:
+    return context.get("mailItemId") or context.get("mail_item_id") or context.get("mailId") or context.get("mail_id")
+
+
+def _action_id(session_id: str, action_type: str, mail_item_id: Any) -> str:
+    mail_part = "unknown" if mail_item_id is None else str(mail_item_id)
+    return f"{session_id}:{mail_part}:{action_type}".replace(" ", "-")
 
 
 def _answer_current_mail(message: str, subject: str, sender: str, content: str) -> str:

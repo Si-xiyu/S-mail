@@ -32,11 +32,15 @@ class ToolCallRecord(BaseModel):
 
 
 class PendingAction(BaseModel):
+    action_id: str | None = Field(default=None, alias="actionId")
     type: MailActionType
+    label: str
     payload: dict[str, Any] = Field(default_factory=dict)
     reason: str
     status: str = "PENDING"
     execution: str = "BACKEND_REQUIRED"
+
+    model_config = {"populate_by_name": True}
 
 
 class PluginChatResponse(BaseModel):

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import Mock, patch
 
 from app.schemas.plugin import PluginChatRequest
 from app.services.tool_router import ToolRouter
+from app.tools.backend_tools import BackendToolClient, to_mail_context
 
 
 class ToolRouterTest(unittest.TestCase):
@@ -56,10 +58,12 @@ class ToolRouterTest(unittest.TestCase):
 
         self.assertEqual(response.status, "SUCCEEDED")
         self.assertEqual(response.pending_actions[0].type, "MARK_READ")
+        self.assertEqual(response.pending_actions[0].action_id, "s1:42:MARK_READ")
+        self.assertEqual(response.pending_actions[0].label, "Mark as read")
         self.assertEqual(response.pending_actions[0].status, "PENDING")
-        self.assertEqual(response.pending_actions[0].payload["mailId"], 42)
+        self.assertEqual(response.pending_actions[0].payload["mailItemId"], 42)
 
-    def test_auto_write_prepares_backend_delegation_only(self) -> None:
+    def test_auto_write_keeps_pending_backend_required_action(self) -> None:
         response = self.router.chat(
             PluginChatRequest(
                 sessionId="s1",
@@ -73,8 +77,57 @@ class ToolRouterTest(unittest.TestCase):
 
         self.assertEqual(response.status, "SUCCEEDED")
         self.assertEqual(response.pending_actions[0].type, "SET_PRIORITY")
-        self.assertEqual(response.pending_actions[0].status, "BACKEND_DELEGATION_PREPARED")
-        self.assertEqual(response.pending_actions[0].execution, "BACKEND_DELEGATION_ONLY")
+        self.assertEqual(response.pending_actions[0].status, "PENDING")
+        self.assertEqual(response.pending_actions[0].execution, "BACKEND_REQUIRED")
+        self.assertEqual(response.pending_actions[0].payload["mailItemId"], 7)
+
+
+class BackendToolClientTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = BackendToolClient()
+
+    def test_current_mail_context_prefers_mail_item_context_path(self) -> None:
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "data": {
+                "mailItemId": 88,
+                "userId": 1,
+                "senderEmail": "teacher@example.com",
+                "subject": "Project update",
+                "contentText": "Please send the project update.",
+            }
+        }
+
+        with patch("app.tools.backend_tools.httpx.get", return_value=response) as get:
+            result = self.client.get_current_mail_context({"mailItemId": 88}, 1)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["source"], "BACKEND")
+        self.assertTrue(get.call_args.args[0].endswith("/internal/v1/tools/mail-items/88/context"))
+        self.assertEqual(to_mail_context(result.data).mail_id, 88)
+
+    def test_current_mail_context_falls_back_to_legacy_mail_path(self) -> None:
+        legacy_response = Mock()
+        legacy_response.raise_for_status.return_value = None
+        legacy_response.json.return_value = {
+            "data": {
+                "mailId": 42,
+                "userId": 1,
+                "senderEmail": "teacher@example.com",
+                "subject": "Legacy mail",
+                "contentText": "Legacy context response.",
+            }
+        }
+
+        with patch("app.tools.backend_tools.httpx.get", side_effect=[Exception("new path unavailable"), legacy_response]) as get:
+            result = self.client.get_current_mail_context({"mailId": 42}, 1)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["source"], "BACKEND")
+        self.assertTrue(get.call_args_list[0].args[0].endswith("/internal/v1/tools/mail-items/42/context"))
+        self.assertTrue(get.call_args_list[1].args[0].endswith("/internal/v1/tools/mails/42"))
+        self.assertEqual(get.call_args_list[1].kwargs["params"], {"userId": 1})
 
 
 if __name__ == "__main__":
