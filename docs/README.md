@@ -25,7 +25,9 @@ docs/
 | 文档 | 作用 |
 | --- | --- |
 | [design/mvp-architecture.md](./design/mvp-architecture.md) | 目标 MVP 架构、服务边界、核心流程 |
+| [design/course-alignment.md](./design/course-alignment.md) | 课程要求逐条对齐、冲突点和优化建议 |
 | [api/mvp-api.md](./api/mvp-api.md) | Workspace API、附件、Agent、Internal API 草案 |
+| [api/agent-plugin-api.md](./api/agent-plugin-api.md) | 后端与 Agent Plugin 的解耦 API 契约 |
 | [report/mvp-round1.md](./report/mvp-round1.md) | 第一轮原型完成记录 |
 
 ## 编写约定

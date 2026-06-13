@@ -108,6 +108,7 @@ Authorization: Bearer <token>
 | `view` | `inbox`、`sent`、`drafts`、`trash`、`junk`、`today`、`important`、`unread` |
 | `categoryId` | 可选，按用户类别过滤 |
 | `keyword` | 可选，关键词 |
+| `syncSince` | 可选，拉取某个时间点之后更新的邮件条目 |
 | `page` | 页码 |
 | `pageSize` | 每页数量 |
 
@@ -123,9 +124,11 @@ Authorization: Bearer <token>
   "summaryPreview": "请在明天下午前提交项目进度并准备演示。",
   "category": { "id": 1, "name": "课程", "color": "#4f46e5" },
   "analysisStatus": "SUCCEEDED",
+  "riskLevel": "LOW",
   "read": false,
   "starred": false,
   "priority": "HIGH",
+  "priorityScore": 86,
   "hasAttachment": true,
   "receivedAt": "2026-06-10T10:30:00"
 }
@@ -153,6 +156,9 @@ Authorization: Bearer <token>
     "summary": ["明天下午前提交项目进度", "准备 5 分钟阶段演示"],
     "category": { "id": 1, "name": "课程", "color": "#4f46e5" },
     "junk": false,
+    "priority": "HIGH",
+    "priorityScore": 86,
+    "riskLevel": "LOW",
     "riskHints": []
   },
   "attachments": [
@@ -286,7 +292,48 @@ Authorization: Bearer <token>
 
 删除用户类别。被删除类别下的邮件回到 Other。
 
-## 7. Agent API
+## 7. Mail Sync 与行为事件 API
+
+### GET `/api/v1/workspace/sync`
+
+轻量同步接口，用于登录后拉取、手动刷新或轮询更新。
+
+参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| `since` | 可选，上次同步时间 |
+
+响应：
+
+```json
+{
+  "serverTime": "2026-06-10T10:35:00",
+  "unreadCount": 8,
+  "changedItems": [],
+  "deletedItemIds": []
+}
+```
+
+### POST `/api/v1/mailbox/items/{itemId}/events`
+
+记录用户行为信号，用于优先级预测。
+
+```json
+{
+  "eventType": "OPENED"
+}
+```
+
+`eventType` 可选：
+
+- `OPENED`
+- `REPLIED`
+- `STARRED`
+- `DELETED`
+- `MARKED_JUNK`
+
+## 8. Agent API
 
 ### POST `/api/v1/agent/sessions`
 
@@ -361,7 +408,7 @@ Authorization: Bearer <token>
 
 用户确认 Agent 写操作。
 
-## 8. AI Analysis API
+## 9. AI Analysis API
 
 前端一般不直接触发自动分析，但需要能查看状态或手动重试。
 
@@ -377,7 +424,36 @@ Authorization: Bearer <token>
 }
 ```
 
-## 9. Internal Tool API
+## 10. Settings API
+
+### GET `/api/v1/settings`
+
+返回用户设置。
+
+```json
+{
+  "aiEnabled": true,
+  "llmProvider": "DEEPSEEK",
+  "hasLlmApiKey": false,
+  "agentAutoWriteEnabled": false,
+  "mailPollingIntervalSeconds": 30
+}
+```
+
+### PATCH `/api/v1/settings`
+
+```json
+{
+  "aiEnabled": true,
+  "llmProvider": "DEEPSEEK",
+  "llmApiKey": "sk-***",
+  "agentAutoWriteEnabled": false
+}
+```
+
+后端不应把 API Key 明文返回前端。
+
+## 11. Internal Tool API
 
 仅 Agent 调用，需要内部 token：
 
@@ -403,13 +479,13 @@ RAG Tool 或 mock RAG Tool 使用。MVP 可返回演示数据。
 
 ### POST `/internal/v1/tools/analysis-results`
 
-自动分析管道写回摘要、分类、Junk、状态。
+自动分析管道写回摘要、分类、Junk、优先级、风险提示和状态。
 
 ### POST `/internal/v1/tools/mail-actions`
 
 交互式 Agent 的写操作执行入口。只有用户确认后，后端才应调用实际写操作。
 
-## 10. 状态枚举
+## 12. 状态枚举
 
 ### `analysisStatus`
 
@@ -432,6 +508,13 @@ RAG Tool 或 mock RAG Tool 使用。MVP 可返回演示数据。
 - `NORMAL`
 - `HIGH`
 - `URGENT`
+
+### `riskLevel`
+
+- `NONE`
+- `LOW`
+- `MEDIUM`
+- `HIGH`
 
 ### `agent scope`
 
