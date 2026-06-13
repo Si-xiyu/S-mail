@@ -253,6 +253,125 @@ class PluginApiTests(unittest.TestCase):
         self.assertNotIn("mailId", action["payload"])
         self.assertEqual(action["status"], "PENDING")
 
+    def test_execute_action_disabled_plugin_returns_noop(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:SET_PRIORITY",
+                "userId": 1,
+                "confirmed": True,
+                "type": "SET_PRIORITY",
+                "payload": {"mailItemId": 88, "priority": "HIGH"},
+                "pluginConfig": {"aiPluginEnabled": False},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "DISABLED")
+        self.assertEqual(body["execution"], "NONE")
+        self.assertIsNone(body["backendOperation"])
+
+    def test_execute_action_without_confirmation_rejects_when_auto_write_disabled(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:SET_PRIORITY",
+                "userId": 1,
+                "confirmed": False,
+                "type": "SET_PRIORITY",
+                "payload": {"mailItemId": 88, "priority": "HIGH"},
+                "toolPolicy": {"agentAutoWriteEnabled": False},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "REJECTED")
+        self.assertEqual(body["execution"], "NONE")
+        self.assertIsNone(body["backendOperation"])
+
+    def test_execute_action_confirmed_delegates_backend_operation(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:SET_PRIORITY",
+                "userId": 1,
+                "confirmed": True,
+                "type": "SET_PRIORITY",
+                "payload": {"mailItemId": 88, "priority": "HIGH"},
+                "toolPolicy": {"agentAutoWriteEnabled": False},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "DELEGATED")
+        self.assertEqual(body["actionId"], "s1:88:SET_PRIORITY")
+        self.assertEqual(body["execution"], "BACKEND_REQUIRED")
+        self.assertEqual(
+            body["backendOperation"],
+            {
+                "method": "POST",
+                "path": "/internal/v1/tools/mail-actions/execute",
+                "payload": {"mailItemId": 88, "priority": "HIGH"},
+            },
+        )
+
+    def test_execute_action_auto_write_delegates_without_confirmation(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:MARK_READ",
+                "userId": 1,
+                "confirmed": False,
+                "type": "MARK_READ",
+                "payload": {"mailItemId": 88, "read": True},
+                "toolPolicy": {"agentAutoWriteEnabled": True},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "DELEGATED")
+        self.assertEqual(body["execution"], "BACKEND_REQUIRED")
+        self.assertEqual(body["backendOperation"]["payload"], {"mailItemId": 88, "read": True})
+
+    def test_execute_action_legacy_mail_id_is_normalized(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:MOVE_TO_JUNK",
+                "userId": 1,
+                "confirmed": True,
+                "type": "MOVE_TO_JUNK",
+                "payload": {"mailId": 88},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["backendOperation"]["payload"]
+        self.assertEqual(payload["mailItemId"], 88)
+        self.assertNotIn("mailId", payload)
+
+    def test_execute_action_unsupported_type_is_rejected(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:DELETE",
+                "userId": 1,
+                "confirmed": True,
+                "type": "DELETE",
+                "payload": {"mailItemId": 88},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "REJECTED")
+        self.assertEqual(body["execution"], "NONE")
+        self.assertIsNone(body["backendOperation"])
+
 
 if __name__ == "__main__":
     unittest.main()
