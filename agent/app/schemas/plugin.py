@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 PluginScope = Literal["CURRENT_MAIL", "GLOBAL"]
 PluginStatus = Literal["SUCCEEDED", "DISABLED", "PARTIAL", "FAILED"]
 MailActionType = Literal["SET_PRIORITY", "SET_CATEGORY", "MOVE_TO_JUNK", "MARK_READ"]
+ActionExecutionStatus = Literal["DELEGATED", "DISABLED", "REJECTED", "FAILED"]
+ActionExecutionMode = Literal["BACKEND_REQUIRED", "NONE"]
 
 
 class PluginChatRequest(BaseModel):
@@ -48,5 +50,33 @@ class PluginChatResponse(BaseModel):
     answer: str
     tool_calls: list[ToolCallRecord] = Field(default_factory=list, alias="toolCalls")
     pending_actions: list[PendingAction] = Field(default_factory=list, alias="pendingActions")
+
+    model_config = {"populate_by_name": True}
+
+
+class ConfirmedActionExecuteRequest(BaseModel):
+    action_id: str = Field(alias="actionId")
+    user_id: int | str = Field(alias="userId")
+    confirmed: bool = False
+    type: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    plugin_config: dict[str, Any] = Field(default_factory=dict, alias="pluginConfig")
+    tool_policy: dict[str, Any] = Field(default_factory=dict, alias="toolPolicy")
+
+    model_config = {"populate_by_name": True}
+
+
+class BackendOperation(BaseModel):
+    method: Literal["POST"]
+    path: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConfirmedActionExecuteResponse(BaseModel):
+    status: ActionExecutionStatus
+    action_id: str = Field(alias="actionId")
+    execution: ActionExecutionMode = "NONE"
+    backend_operation: BackendOperation | None = Field(default=None, alias="backendOperation")
+    message: str
 
     model_config = {"populate_by_name": True}

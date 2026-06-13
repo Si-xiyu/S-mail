@@ -2,11 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.schemas.plugin import PendingAction, PluginChatRequest, PluginChatResponse, ToolCallRecord
+from app.schemas.plugin import (
+    BackendOperation,
+    ConfirmedActionExecuteRequest,
+    ConfirmedActionExecuteResponse,
+    PendingAction,
+    PluginChatRequest,
+    PluginChatResponse,
+    ToolCallRecord,
+)
 from app.services.rag_tool import RagTool
 from app.tools.backend_tools import BackendToolClient, to_mail_context
 
 
+BACKEND_ACTION_EXECUTE_PATH = "/internal/v1/tools/mail-actions/execute"
 ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any], str]] = {
     "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}, "Move to junk"),
     "MARK_READ": ("MARK_READ", {"read": True}, "Mark as read"),
@@ -30,6 +39,43 @@ class ToolRouter:
         if request.scope == "GLOBAL":
             return self._handle_global(request)
         return self._handle_current_mail(request)
+
+    def execute_action(self, request: ConfirmedActionExecuteRequest) -> ConfirmedActionExecuteResponse:
+        if not _plugin_enabled(request.plugin_config):
+            return ConfirmedActionExecuteResponse(
+                status="DISABLED",
+                actionId=request.action_id,
+                execution="NONE",
+                message="AI Plugin is disabled; no action was executed.",
+            )
+
+        if request.type not in ACTION_KEYWORDS:
+            return ConfirmedActionExecuteResponse(
+                status="REJECTED",
+                actionId=request.action_id,
+                execution="NONE",
+                message=f"Unsupported action type: {request.type}.",
+            )
+
+        if not request.confirmed and not _auto_write_enabled(request.tool_policy):
+            return ConfirmedActionExecuteResponse(
+                status="REJECTED",
+                actionId=request.action_id,
+                execution="NONE",
+                message="Action was not confirmed and agentAutoWriteEnabled is false.",
+            )
+
+        return ConfirmedActionExecuteResponse(
+            status="DELEGATED",
+            actionId=request.action_id,
+            execution="BACKEND_REQUIRED",
+            backendOperation=BackendOperation(
+                method="POST",
+                path=BACKEND_ACTION_EXECUTE_PATH,
+                payload=_normalized_action_payload(request.payload),
+            ),
+            message="Action confirmed; backend execution is required.",
+        )
 
     def _handle_current_mail(self, request: PluginChatRequest) -> PluginChatResponse:
         pending_actions = self._mail_action_tool(request)
@@ -135,6 +181,16 @@ def _detect_action(message: str) -> tuple[Any, dict[str, Any], str | None]:
 
 def _mail_item_id_from_context(context: dict[str, Any]) -> Any:
     return context.get("mailItemId") or context.get("mail_item_id") or context.get("mailId") or context.get("mail_id")
+
+
+def _normalized_action_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    mail_item_id = _mail_item_id_from_context(normalized)
+    for legacy_key in ("mailId", "mail_id", "mail_item_id"):
+        normalized.pop(legacy_key, None)
+    if mail_item_id is not None:
+        normalized["mailItemId"] = mail_item_id
+    return normalized
 
 
 def _action_id(session_id: str, action_type: str, mail_item_id: Any) -> str:
