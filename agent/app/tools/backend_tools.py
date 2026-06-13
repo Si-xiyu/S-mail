@@ -62,6 +62,24 @@ class BackendToolClient:
         except Exception as exc:
             return ToolResult(ok=False, error=str(exc))
 
+    def get_current_mail_context(self, context: dict[str, Any], user_id: int | str) -> ToolResult:
+        mail_id = context.get("mailId") or context.get("mail_id") or context.get("id")
+        if mail_id is None:
+            if not settings.mock_on_tool_error:
+                return ToolResult(ok=False, error="CURRENT_MAIL context must include mailId")
+            return ToolResult(
+                ok=True,
+                data={
+                    **self._mock_mail(0, _coerce_user_id(user_id), "missing mailId in plugin context"),
+                    "source": "MOCK",
+                },
+            )
+
+        result = self.get_mail(_coerce_int(mail_id), _coerce_user_id(user_id))
+        if result.ok and result.data is not None:
+            result.data.setdefault("source", "BACKEND")
+        return result
+
     def _mock_mail(self, mail_id: int, user_id: int, reason: str) -> dict[str, Any]:
         return {
             "mailId": mail_id,
@@ -78,12 +96,30 @@ class BackendToolClient:
 
 def to_mail_context(data: dict[str, Any]) -> MailContext:
     return MailContext(
-        mail_id=data.get("mailId") or data.get("mail_id"),
-        user_id=data.get("userId") or data.get("user_id"),
-        sender_email=data.get("senderEmail") or data.get("sender_email"),
+        mail_id=_first_present(data, "mailId", "mail_id"),
+        user_id=_first_present(data, "userId", "user_id"),
+        sender_email=_first_present(data, "senderEmail", "sender_email"),
         subject=data.get("subject", ""),
         content_text=data.get("contentText") or data.get("content_text") or "",
         content_html=data.get("contentHtml") or data.get("content_html"),
         priority=data.get("priority", "NORMAL"),
         recipients=data.get("recipients", []),
     )
+
+
+def _coerce_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _coerce_user_id(value: int | str) -> int:
+    return _coerce_int(value)
+
+
+def _first_present(data: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in data:
+            return data[key]
+    return None
