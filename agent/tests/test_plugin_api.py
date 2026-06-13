@@ -5,6 +5,11 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.agent import ToolResult
+from fixtures import EXPECTED_ANALYSIS_RESPONSES, analysis_request
+
+
+RISK_LEVELS = {"LOW", "MEDIUM", "HIGH"}
+PRIORITIES = {"LOW", "NORMAL", "HIGH", "URGENT"}
 
 
 class PluginApiTests(unittest.TestCase):
@@ -32,15 +37,7 @@ class PluginApiTests(unittest.TestCase):
     def test_analysis_disabled_returns_no_analysis(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
-            json={
-                "taskId": "task-1",
-                "userId": "user-1",
-                "mailItemId": "mail-1",
-                "mail": {"subject": "Quarterly review", "content": "Please review the report."},
-                "userCategories": ["Work", "Junk Mail"],
-                "behaviorSignals": {"frequentSender": True},
-                "pluginConfig": {"aiPluginEnabled": False, "llmEnabled": False},
-            },
+            json=analysis_request("disabled_ai_plugin"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -51,25 +48,12 @@ class PluginApiTests(unittest.TestCase):
         self.assertIsNone(body["priority"])
         self.assertEqual(body["modelInfo"]["provider"], "RULES")
         self.assertEqual(body["modelInfo"]["mode"], "rules-fallback")
+        self.assertEqual(body["modelInfo"]["fallbackUsed"], True)
 
     def test_category_object_input_preserves_id_and_name(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
-            json={
-                "taskId": "task-category-object",
-                "userId": "user-1",
-                "mailItemId": "mail-category-object",
-                "mail": {
-                    "subject": "Project report approval",
-                    "content": "Please review the project report before approval.",
-                },
-                "userCategories": [
-                    {"id": 7, "name": "Project"},
-                    {"id": 8, "name": "Other"},
-                ],
-                "behaviorSignals": {},
-                "pluginConfig": {"aiPluginEnabled": True, "llmEnabled": False},
-            },
+            json=analysis_request("category_id_name_preservation"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -98,26 +82,7 @@ class PluginApiTests(unittest.TestCase):
     def test_rules_fallback_detects_junk_risk_priority_and_category_object(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
-            json={
-                "taskId": "task-2",
-                "userId": "user-1",
-                "mailItemId": "mail-2",
-                "mail": {
-                    "subject": "Urgent click to claim your prize",
-                    "content": (
-                        "Winner! Click here https://example.test to verify your account. "
-                        "Your verification code and free prize expire today."
-                    ),
-                    "senderEmail": "notice@secure-prize.xyz",
-                },
-                "userCategories": [
-                    {"id": 1, "name": "Work"},
-                    {"id": 2, "name": "Junk Mail"},
-                    {"id": 3, "name": "Finance"},
-                ],
-                "behaviorSignals": {"recentJunkSender": True, "frequentSender": True},
-                "pluginConfig": {"aiPluginEnabled": True, "llmEnabled": False},
-            },
+            json=analysis_request("junk_phishing_like_mail"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -138,19 +103,7 @@ class PluginApiTests(unittest.TestCase):
     def test_model_info_reports_deepseek_boundary_with_rules_fallback(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
-            json={
-                "taskId": "task-model-info",
-                "userId": "user-1",
-                "mailItemId": "mail-model-info",
-                "mail": {"subject": "Status", "content": "Project status update."},
-                "userCategories": ["Project", "Other"],
-                "behaviorSignals": {},
-                "pluginConfig": {
-                    "aiPluginEnabled": True,
-                    "llmEnabled": True,
-                    "apiKey": "test-key",
-                },
-            },
+            json=analysis_request("deepseek_configured_rules_fallback"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -159,6 +112,44 @@ class PluginApiTests(unittest.TestCase):
         self.assertEqual(model_info["mode"], "rules-fallback")
         self.assertIs(model_info["llmEnabled"], True)
         self.assertIs(model_info["fallbackUsed"], True)
+
+    def test_analysis_fixture_contracts_are_stable(self) -> None:
+        for name, expected in EXPECTED_ANALYSIS_RESPONSES.items():
+            with self.subTest(fixture=name):
+                response = self.client.post("/plugin/v1/analysis/mail", json=analysis_request(name))
+
+                self.assertEqual(response.status_code, 200)
+                body = response.json()
+                for field, expected_value in expected.items():
+                    if field == "modelInfo":
+                        for model_field, model_expected_value in expected_value.items():
+                            self.assertEqual(body["modelInfo"][model_field], model_expected_value)
+                    else:
+                        self.assertEqual(body[field], expected_value)
+
+    def test_analysis_model_info_provider_rules_when_llm_disabled(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/analysis/mail",
+            json=analysis_request("normal_incoming_mail"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        model_info = response.json()["modelInfo"]
+        self.assertEqual(model_info["provider"], "RULES")
+        self.assertEqual(model_info["mode"], "rules-fallback")
+        self.assertIs(model_info["llmEnabled"], False)
+        self.assertIs(model_info["fallbackUsed"], True)
+
+    def test_analysis_risk_level_and_priority_enums(self) -> None:
+        for name in EXPECTED_ANALYSIS_RESPONSES:
+            with self.subTest(fixture=name):
+                response = self.client.post("/plugin/v1/analysis/mail", json=analysis_request(name))
+
+                self.assertEqual(response.status_code, 200)
+                body = response.json()
+                self.assertIn(body["riskLevel"], RISK_LEVELS)
+                if body["priority"] is not None:
+                    self.assertIn(body["priority"], PRIORITIES)
 
     def test_agent_chat_disabled_plugin(self) -> None:
         response = self.client.post(
