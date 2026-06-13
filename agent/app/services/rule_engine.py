@@ -290,8 +290,6 @@ class RuleEngine:
         return None
 
     def _risk_level(self, hints: list[str], junk: bool) -> str:
-        if junk and len(hints) >= 3:
-            return "CRITICAL"
         if junk or len(hints) >= 3:
             return "HIGH"
         if hints:

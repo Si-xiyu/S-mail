@@ -10,12 +10,16 @@ from app.schemas.agent import (
     PluginCapabilities,
     PluginHealthResponse,
 )
+from app.schemas.plugin import PluginChatRequest, PluginChatResponse
 from app.services.agent_loop import SmartMailAgent
 from app.services.rule_engine import RuleEngine
+from app.services.tool_router import ToolRouter
 
 router = APIRouter()
+plugin_router = APIRouter(prefix="/plugin/v1/agent", tags=["agent-plugin"])
 agent = SmartMailAgent()
 rules = RuleEngine()
+tool_router = ToolRouter()
 
 
 @router.get("/plugin/v1/health", response_model=PluginHealthResponse, tags=["plugin"])
@@ -55,6 +59,11 @@ def analyze_mail(request: AnalysisRequest) -> AnalysisResponse:
 @router.post("/api/v1/agent/tasks", response_model=AgentTaskResponse, tags=["agent"])
 def run_task(request: AgentTaskRequest) -> AgentTaskResponse:
     return agent.run(request)
+
+
+@plugin_router.post("/chat", response_model=PluginChatResponse)
+def chat(request: PluginChatRequest) -> PluginChatResponse:
+    return tool_router.chat(request)
 
 
 def _model_info(_request: AnalysisRequest) -> ModelInfo:

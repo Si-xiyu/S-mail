@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 AgentTask = Literal["summary", "reply_draft", "analyze"]
 AnalysisStatus = Literal["DISABLED", "SUCCEEDED", "PARTIAL", "FAILED"]
 Priority = Literal["LOW", "NORMAL", "HIGH", "URGENT"]
-RiskLevel = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 
 
 class AgentTaskRequest(BaseModel):
