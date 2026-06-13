@@ -4,9 +4,9 @@ import { computed } from 'vue'
 import type { Mail } from '../types'
 
 const props = withDefaults(defineProps<{
-  mailId?: string
+  mailId?: string | null
 }>(), {
-  mailId: ''
+  mailId: null
 })
 
 const mailStore = useMailStore()
