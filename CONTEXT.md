@@ -4,9 +4,17 @@ SmartMail is a course project for an intelligent mail system. This glossary defi
 
 ## Language
 
-**AI-Native Mail Workspace**:
-The product identity for SmartMail: a mail workspace where automatic summaries, categories, junk separation, and contextual assistant entry points are part of the default experience. The first version still depends on a stable mail delivery loop before advanced AI features can be useful.
-_Avoid_: traditional mail client with optional AI, AI chatbot
+**Basic Mail Mode**:
+The SmartMail experience when the AI Plugin is disabled. Basic Mail Mode provides the required mail system capabilities, including registration, login, sending, receiving, syncing, searching, attachments, read state, deletion, and mailbox folders.
+_Avoid_: degraded system, broken AI mode
+
+**AI Mail Workspace Mode**:
+The SmartMail experience when the AI Plugin is enabled. AI Mail Workspace Mode adds automatic summaries, categories, junk separation, risk hints, priority prediction, and assistant entry points on top of Basic Mail Mode.
+_Avoid_: mandatory AI, AI-only mailbox
+
+**AI Plugin**:
+The optional intelligent system capability that can be enabled or disabled without breaking Basic Mail Mode. When enabled, it turns SmartMail into AI Mail Workspace Mode.
+_Avoid_: core mail dependency, chatbot only
 
 **SmartMail System Mailbox**:
 An email account registered inside the SmartMail system and served by the same SmartMail server. First-version mail delivery is between SmartMail System Mailboxes only.
@@ -80,6 +88,26 @@ _Avoid_: deleted mail, failed delivery
 A system-level location for a Mailbox Item, such as Inbox, Sent, Trash, or Junk. Mailbox Folders organize delivery state and primary navigation; they are distinct from semantic Mail Categories.
 _Avoid_: category, label
 
+**Mail Sync**:
+The user's mailbox being refreshed from the SmartMail server after login and during active use. In the first version, Mail Sync can be implemented by initial loading, manual refresh, and lightweight polling before real-time push is added.
+_Avoid_: external server synchronization, draft sync
+
+**New Mail Notification**:
+The user-facing signal that new mail has arrived while the user is using SmartMail. New Mail Notification is part of the first-version experience and may update badges, unread counts, or show an in-app prompt.
+_Avoid_: external server push, AI analysis result
+
+**Behavior Signal**:
+A recorded user interaction with mail, such as opening, replying, starring, deleting, or marking as junk. Behavior Signals are used to support priority prediction and course-required intelligent mail sorting.
+_Avoid_: raw click log, audit log
+
+**Priority Prediction**:
+AI or rule-assisted estimation of mail importance based on mail content and Behavior Signals. Priority Prediction can affect sorting or visual emphasis without blocking mail delivery.
+_Avoid_: manual star, delivery status
+
+**Security Risk Hint**:
+An AI or rule-assisted warning about suspicious mail characteristics such as hidden malicious links, mismatched sender identity, or risky wording. Security Risk Hints are shown to users but do not delete mail automatically.
+_Avoid_: junk classification, virus scan
+
 **Mail Q&A Agent**:
 An on-demand assistant that answers questions using the current mail or the user's mail collection as context. Mail Q&A Agent is manually invoked by the user and is separate from Automatic Mail Analysis.
 _Avoid_: automatic summary, background classifier
@@ -124,7 +152,7 @@ Domain expert: No. The first version only delivers mail between SmartMail System
 
 Developer: Is SmartMail just a normal mailbox with a few AI buttons?
 
-Domain expert: No. SmartMail should feel like an AI-Native Mail Workspace: AI summaries, categories, junk separation, and assistant entry points shape the default mail experience.
+Domain expert: Not when the AI Plugin is enabled. With the plugin enabled, SmartMail should feel like AI Mail Workspace Mode. With the plugin disabled, it remains a Basic Mail Mode system.
 
 Developer: Is a draft already a mail in the recipient's mailbox?
 
@@ -189,3 +217,19 @@ Domain expert: No. Folders describe where a Mailbox Item lives in the system nav
 Developer: Are mail categories shared across all users?
 
 Domain expert: No. Mail Categories belong to individual users. Each user has their own categories, including fallback categories such as Other and Junk Mail.
+
+Developer: Does Mail Sync mean connecting to external mail servers?
+
+Domain expert: No. Mail Sync means the SmartMail client refreshes mailbox state from the SmartMail server after login and during active use.
+
+Developer: Is new mail notification only a future enhancement?
+
+Domain expert: No. New Mail Notification is part of the first version, even if the first implementation uses a simple in-app signal rather than advanced push infrastructure.
+
+Developer: Is Priority Prediction the same as starring a mail?
+
+Domain expert: No. Starring is a manual user action. Priority Prediction estimates importance from mail content and Behavior Signals.
+
+Developer: Should a Security Risk Hint automatically delete a suspicious mail?
+
+Domain expert: No. Security Risk Hints warn the user. Junk classification and deletion are separate decisions.
