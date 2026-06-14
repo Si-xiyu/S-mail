@@ -1,4 +1,5 @@
 package com.smartmail.mailbox.dto;
 
-public record MoveRequest(String folder) {
-}
+import jakarta.validation.constraints.NotBlank;
+
+public record MoveRequest(@NotBlank String folder) {}

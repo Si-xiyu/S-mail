@@ -2,7 +2,7 @@ package com.smartmail.mail.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.smartmail.ai.mapper.MailAiResultMapper;
-import com.smartmail.ai.service.AnalysisTaskService;
+import com.smartmail.analysis.service.AnalysisService;
 import com.smartmail.attachment.service.AttachmentService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.CurrentUser;
@@ -36,7 +36,7 @@ public class MailService {
     private final SysUserMapper userMapper;
     private final MailAiResultMapper aiResultMapper;
     private final AttachmentService attachmentService;
-    private final AnalysisTaskService analysisTaskService;
+    private final AnalysisService analysisService;
 
     public MailService(
             MailMessageMapper mailMapper,
@@ -45,7 +45,7 @@ public class MailService {
             SysUserMapper userMapper,
             MailAiResultMapper aiResultMapper,
             AttachmentService attachmentService,
-            AnalysisTaskService analysisTaskService
+            AnalysisService analysisService
     ) {
         this.mailMapper = mailMapper;
         this.recipientMapper = recipientMapper;
@@ -53,7 +53,7 @@ public class MailService {
         this.userMapper = userMapper;
         this.aiResultMapper = aiResultMapper;
         this.attachmentService = attachmentService;
-        this.analysisTaskService = analysisTaskService;
+        this.analysisService = analysisService;
     }
 
     @Transactional
@@ -75,8 +75,8 @@ public class MailService {
         message.setCreatedAt(now);
         mailMapper.insert(message);
 
-        int attachmentCount = attachmentService.bindPendingAttachments(sender.id(), message.getId(), request.pendingAttachmentIds());
-        if (attachmentCount > 0) {
+        if (request.pendingAttachmentIds() != null && !request.pendingAttachmentIds().isEmpty()) {
+            attachmentService.bindToMail(message.getId(), request.pendingAttachmentIds());
             message.setHasAttachment(true);
             mailMapper.updateById(message);
         }
@@ -87,6 +87,8 @@ public class MailService {
         if (request.cc() != null) {
             allRecipients.addAll(request.cc());
         }
+        List<String> delivered = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
         for (String rawEmail : allRecipients) {
             String email = rawEmail.trim().toLowerCase();
             SysUser recipientUser = userMapper.findByEmail(email);
@@ -100,10 +102,13 @@ public class MailService {
             recipientMapper.insert(recipient);
             if (recipientUser != null) {
                 MailboxItem item = createMailboxItem(recipientUser.getId(), message.getId(), "INBOX", false, now);
-                analysisTaskService.enqueuePending(recipientUser.getId(), item.getId(), message.getId());
+                analysisService.createTask(item.getId(), message.getId(), recipientUser.getId());
+                delivered.add(email);
+            } else {
+                failed.add(email);
             }
         }
-        return new MailSendResponse(message.getId(), message.getMessageNo());
+        return new MailSendResponse(message.getId(), message.getMessageNo(), delivered, failed);
     }
 
     public MailDetailResponse detail(Long mailId) {
@@ -142,7 +147,7 @@ public class MailService {
                 message.getSentAt(),
                 recipients,
                 aiResults,
-                attachmentService.listMailAttachments(mailId)
+                attachmentService.getAttachmentsForMail(mailId)
         );
     }
 

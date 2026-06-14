@@ -12,6 +12,10 @@ spring:
   sql:
     init:
       mode: never
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 mybatis-plus:
   configuration:
@@ -28,7 +32,7 @@ smartmail:
   ai:
     enabled: ${SMARTMAIL_AI_ENABLED:true}
     agent-base-url: ${SMARTMAIL_AGENT_BASE_URL:http://localhost:8000}
+    plugin-token: ${SMARTMAIL_AGENT_PLUGIN_TOKEN:smartmail-agent-plugin-dev-token}
     timeout-seconds: 5
-  attachment:
-    storage-root: ${SMARTMAIL_ATTACHMENT_STORAGE_ROOT:storage/attachments}
-    max-file-size-bytes: ${SMARTMAIL_ATTACHMENT_MAX_FILE_SIZE_BYTES:26214400}
+  storage:
+    attachment-path: ${SMARTMAIL_STORAGE_PATH:./storage/attachments}

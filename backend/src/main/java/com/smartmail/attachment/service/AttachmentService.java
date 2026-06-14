@@ -1,7 +1,6 @@
 package com.smartmail.attachment.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.smartmail.attachment.config.AttachmentStorageProperties;
+import com.smartmail.attachment.config.AttachmentStorageConfig;
 import com.smartmail.attachment.dto.AttachmentResponse;
 import com.smartmail.attachment.dto.PendingAttachmentResponse;
 import com.smartmail.attachment.entity.MailAttachment;
@@ -11,206 +10,201 @@ import com.smartmail.attachment.mapper.PendingAttachmentMapper;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.UserContext;
 import com.smartmail.mailbox.mapper.MailboxItemMapper;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.DigestInputStream;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.HexFormat;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class AttachmentService {
+
+    private final AttachmentStorageConfig storageConfig;
     private final PendingAttachmentMapper pendingMapper;
-    private final MailAttachmentMapper attachmentMapper;
-    private final MailboxItemMapper mailboxMapper;
-    private final AttachmentStorageProperties properties;
+    private final MailAttachmentMapper mailAttachmentMapper;
+    private final MailboxItemMapper mailboxItemMapper;
 
     public AttachmentService(
+            AttachmentStorageConfig storageConfig,
             PendingAttachmentMapper pendingMapper,
-            MailAttachmentMapper attachmentMapper,
-            MailboxItemMapper mailboxMapper,
-            AttachmentStorageProperties properties
+            MailAttachmentMapper mailAttachmentMapper,
+            MailboxItemMapper mailboxItemMapper
     ) {
+        this.storageConfig = storageConfig;
         this.pendingMapper = pendingMapper;
-        this.attachmentMapper = attachmentMapper;
-        this.mailboxMapper = mailboxMapper;
-        this.properties = properties;
+        this.mailAttachmentMapper = mailAttachmentMapper;
+        this.mailboxItemMapper = mailboxItemMapper;
     }
 
-    @Transactional
     public PendingAttachmentResponse upload(MultipartFile file) {
         Long userId = UserContext.requireUserId();
-        validateUpload(file);
-        LocalDateTime now = LocalDateTime.now();
-        String originalName = cleanFileName(file.getOriginalFilename());
-        String storedName = UUID.randomUUID() + "-" + originalName;
-        Path target = storageRoot().resolve(userId.toString()).resolve(storedName).normalize();
-        try {
-            Files.createDirectories(target.getParent());
-            file.transferTo(target);
-        } catch (IOException ex) {
-            throw new BusinessException(500, "Failed to store attachment");
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || originalName.isBlank()) {
+            throw new BusinessException(400, "文件名不能为空");
         }
 
-        PendingAttachment pending = new PendingAttachment();
-        pending.setUploaderId(userId);
-        pending.setOriginalName(originalName);
-        pending.setStoragePath(target.toString());
-        pending.setMimeType(file.getContentType());
-        pending.setFileSize(file.getSize());
-        pending.setSha256(sha256(target));
-        pending.setStatus("UPLOADED");
-        pending.setCreatedAt(now);
-        pending.setUpdatedAt(now);
-        pendingMapper.insert(pending);
-        return toPendingResponse(pending);
+        String ext = "";
+        int dot = originalName.lastIndexOf('.');
+        if (dot >= 0) {
+            ext = originalName.substring(dot);
+        }
+        String storedName = UUID.randomUUID().toString() + ext;
+        Path dest = storageConfig.getStoragePath().resolve(storedName);
+
+        try {
+            Files.copy(file.getInputStream(), dest, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new BusinessException(500, "附件保存失败: " + e.getMessage());
+        }
+
+        String sha256 = computeSha256(dest);
+        PendingAttachment entity = new PendingAttachment();
+        entity.setUploaderId(userId);
+        entity.setOriginalName(originalName);
+        entity.setStoragePath(dest.toString());
+        entity.setMimeType(file.getContentType());
+        entity.setFileSize(file.getSize());
+        entity.setSha256(sha256);
+        entity.setStatus("UPLOADED");
+        entity.setCreatedAt(LocalDateTime.now());
+        pendingMapper.insert(entity);
+
+        return new PendingAttachmentResponse(
+                entity.getId(),
+                entity.getOriginalName(),
+                entity.getMimeType(),
+                entity.getFileSize(),
+                entity.getStatus()
+        );
     }
 
-    @Transactional
-    public void deletePending(Long pendingAttachmentId) {
+    public void removePending(Long pendingId) {
         Long userId = UserContext.requireUserId();
-        PendingAttachment pending = pendingMapper.selectById(pendingAttachmentId);
-        if (pending == null || !userId.equals(pending.getUploaderId()) || !"UPLOADED".equals(pending.getStatus())) {
-            throw new BusinessException(404, "Pending attachment not found");
+        PendingAttachment pending = pendingMapper.findOwnedPending(pendingId, userId);
+        if (pending == null) {
+            throw new BusinessException(404, "未找到待绑定附件");
         }
-        pending.setStatus("DELETED");
-        pending.setUpdatedAt(LocalDateTime.now());
-        pendingMapper.updateById(pending);
         try {
             Files.deleteIfExists(Path.of(pending.getStoragePath()));
         } catch (IOException ignored) {
         }
+        pendingMapper.deleteById(pendingId);
     }
 
-    @Transactional
-    public int bindPendingAttachments(Long uploaderId, Long mailId, List<Long> pendingAttachmentIds) {
-        if (pendingAttachmentIds == null || pendingAttachmentIds.isEmpty()) {
-            return 0;
+    public void bindToMail(Long mailId, List<Long> pendingIds) {
+        Long userId = UserContext.requireUserId();
+        if (pendingIds == null || pendingIds.isEmpty()) {
+            return;
         }
-        List<Long> distinctIds = pendingAttachmentIds.stream().distinct().toList();
-        List<PendingAttachment> pendingAttachments = pendingMapper.selectList(
-                new QueryWrapper<PendingAttachment>()
-                        .eq("uploader_id", uploaderId)
-                        .eq("status", "UPLOADED")
-                        .in("id", distinctIds)
-        );
-        if (pendingAttachments.size() != distinctIds.size()) {
-            throw new BusinessException(400, "Invalid pending attachment");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        for (PendingAttachment pending : pendingAttachments.stream().sorted(Comparator.comparing(PendingAttachment::getId)).toList()) {
+        for (Long pendingId : pendingIds) {
+            PendingAttachment pending = pendingMapper.findOwnedPending(pendingId, userId);
+            if (pending == null) {
+                throw new BusinessException(400, "待绑定附件不存在或无权操作: " + pendingId);
+            }
             MailAttachment attachment = new MailAttachment();
             attachment.setMailId(mailId);
-            attachment.setUploaderId(uploaderId);
+            attachment.setUploaderId(userId);
             attachment.setOriginalName(pending.getOriginalName());
             attachment.setStoragePath(pending.getStoragePath());
             attachment.setMimeType(pending.getMimeType());
             attachment.setFileSize(pending.getFileSize());
             attachment.setSha256(pending.getSha256());
-            attachment.setCreatedAt(now);
-            attachmentMapper.insert(attachment);
-
-            pending.setStatus("BOUND");
-            pending.setBoundMailId(mailId);
-            pending.setUpdatedAt(now);
-            pendingMapper.updateById(pending);
+            attachment.setCreatedAt(LocalDateTime.now());
+            mailAttachmentMapper.insert(attachment);
+            pendingMapper.deleteById(pendingId);
         }
-        return pendingAttachments.size();
     }
 
-    public List<AttachmentResponse> listMailAttachments(Long mailId) {
-        return attachmentMapper.listByMailId(mailId).stream().map(this::toAttachmentResponse).toList();
-    }
-
-    public DownloadFile loadForDownload(Long attachmentId) {
+    public org.springframework.core.io.Resource download(Long attachmentId) {
         Long userId = UserContext.requireUserId();
-        MailAttachment attachment = attachmentMapper.selectById(attachmentId);
-        if (attachment == null || mailboxMapper.findVisibleByUserAndMail(userId, attachment.getMailId()) == null) {
-            throw new BusinessException(404, "Attachment not found");
+        MailAttachment attachment = mailAttachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            throw new BusinessException(404, "附件不存在");
         }
-        Path file = Path.of(attachment.getStoragePath()).normalize();
-        if (!Files.exists(file) || !Files.isRegularFile(file)) {
-            throw new BusinessException(404, "Attachment file not found");
+        if (attachment.getMailId() != null) {
+            var item = mailboxItemMapper.findVisibleByUserAndMail(userId, attachment.getMailId());
+            if (item == null) {
+                throw new BusinessException(403, "无权下载该附件");
+            }
         }
-        return new DownloadFile(new FileSystemResource(file), attachment.getOriginalName(), attachment.getMimeType(), attachment.getFileSize());
+        Path filePath = Path.of(attachment.getStoragePath());
+        if (!Files.exists(filePath)) {
+            throw new BusinessException(404, "附件文件不存在");
+        }
+        return new org.springframework.core.io.InputStreamResource(
+                () -> {
+                    try {
+                        return Files.newInputStream(filePath);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+        ) {
+            @Override
+            public String getFilename() {
+                return attachment.getOriginalName();
+            }
+            @Override
+            public long contentLength() {
+                try {
+                    return Files.size(filePath);
+                } catch (IOException e) {
+                    return attachment.getFileSize();
+                }
+            }
+        };
     }
 
-    private void validateUpload(MultipartFile file) {
-        if (file == null || file.isEmpty() || file.getSize() <= 0) {
-            throw new BusinessException(400, "Attachment file is empty");
+    public String getMimeType(Long attachmentId) {
+        MailAttachment attachment = mailAttachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            return "application/octet-stream";
         }
-        if (file.getSize() > properties.getMaxFileSizeBytes()) {
-            throw new BusinessException(400, "Attachment file is too large");
-        }
+        return attachment.getMimeType() != null ? attachment.getMimeType() : "application/octet-stream";
     }
 
-    private String cleanFileName(String originalFilename) {
-        String fileName = StringUtils.cleanPath(originalFilename == null ? "attachment" : originalFilename);
-        if (!StringUtils.hasText(fileName) || Set.of(".", "..").contains(fileName)) {
-            return "attachment";
+    public List<AttachmentResponse> getAttachmentsForMail(Long mailId) {
+        List<MailAttachment> attachments = mailAttachmentMapper.listByMailId(mailId);
+        List<AttachmentResponse> result = new ArrayList<>();
+        for (MailAttachment a : attachments) {
+            result.add(new AttachmentResponse(
+                    a.getId(),
+                    a.getOriginalName(),
+                    a.getMimeType(),
+                    a.getFileSize(),
+                    "/api/v1/attachments/" + a.getId() + "/download"
+            ));
         }
-        return fileName.replace('\\', '_').replace('/', '_');
+        return result;
     }
 
-    private Path storageRoot() {
-        return Path.of(properties.getStorageRoot()).toAbsolutePath().normalize();
-    }
-
-    private String sha256(Path file) {
+    private String computeSha256(Path filePath) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream input = Files.newInputStream(file);
-                 DigestInputStream digestInput = new DigestInputStream(input, digest)) {
-                digestInput.transferTo(OutputStreamNull.INSTANCE);
+            try (InputStream is = Files.newInputStream(filePath)) {
+                byte[] buf = new byte[8192];
+                int read;
+                while ((read = is.read(buf)) != -1) {
+                    digest.update(buf, 0, read);
+                }
             }
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (IOException | NoSuchAlgorithmException ex) {
-            throw new BusinessException(500, "Failed to checksum attachment");
-        }
-    }
-
-    private PendingAttachmentResponse toPendingResponse(PendingAttachment pending) {
-        return new PendingAttachmentResponse(
-                pending.getId(),
-                pending.getOriginalName(),
-                pending.getMimeType(),
-                pending.getFileSize(),
-                pending.getStatus()
-        );
-    }
-
-    private AttachmentResponse toAttachmentResponse(MailAttachment attachment) {
-        return new AttachmentResponse(
-                attachment.getId(),
-                attachment.getOriginalName(),
-                attachment.getMimeType(),
-                attachment.getFileSize(),
-                "/api/v1/attachments/" + attachment.getId() + "/download"
-        );
-    }
-
-    public record DownloadFile(Resource resource, String fileName, String mimeType, Long fileSize) {
-    }
-
-    private static final class OutputStreamNull extends java.io.OutputStream {
-        private static final OutputStreamNull INSTANCE = new OutputStreamNull();
-
-        @Override
-        public void write(int b) {
+            byte[] hash = digest.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException | IOException e) {
+            return null;
         }
     }
 }

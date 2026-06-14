@@ -6,5 +6,4 @@ public record PendingAttachmentResponse(
         String mimeType,
         Long fileSize,
         String status
-) {
-}
+) {}

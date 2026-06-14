@@ -1,12 +1,22 @@
 package com.smartmail.internal.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
 public record InternalMailActionRequest(
-        @NotNull Long userId,
-        @NotNull Long itemId,
-        @NotBlank String action,
-        String value
+        Long userId,
+        Long itemId,
+        Long mailItemId,
+        String action,
+        String type,
+        String value,
+        String priority,
+        Boolean read,
+        String folder,
+        Long categoryId
 ) {
+    public Long resolvedItemId() {
+        return itemId != null ? itemId : mailItemId;
+    }
+
+    public String resolvedAction() {
+        return action != null ? action : type;
+    }
 }
