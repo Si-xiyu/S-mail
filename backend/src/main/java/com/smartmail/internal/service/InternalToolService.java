@@ -196,11 +196,15 @@ public class InternalToolService {
         String preview = text.length() > 120 ? text.substring(0, 120) : text;
         return new InternalMailSearchResponse(
                 item.getId(),
+                item.getId(),
                 mail.getId(),
                 item.getFolder(),
                 mail.getSenderEmail(),
                 mail.getSubject(),
                 preview,
+                preview,
+                1.0,
+                "BACKEND",
                 item.getPriority(),
                 item.getReadFlag(),
                 item.getStarFlag(),

@@ -47,6 +47,12 @@ public class AttachmentService {
 
     public PendingAttachmentResponse upload(MultipartFile file) {
         Long userId = UserContext.requireUserId();
+        if (file.isEmpty() || file.getSize() <= 0) {
+            throw new BusinessException(400, "附件不能为空");
+        }
+        if (file.getSize() > storageConfig.getMaxFileSizeBytes()) {
+            throw new BusinessException(400, "附件大小超过限制");
+        }
         String originalName = file.getOriginalFilename();
         if (originalName == null || originalName.isBlank()) {
             throw new BusinessException(400, "文件名不能为空");
@@ -76,6 +82,7 @@ public class AttachmentService {
         entity.setSha256(sha256);
         entity.setStatus("UPLOADED");
         entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(entity.getCreatedAt());
         pendingMapper.insert(entity);
 
         return new PendingAttachmentResponse(
@@ -102,9 +109,14 @@ public class AttachmentService {
 
     public void bindToMail(Long mailId, List<Long> pendingIds) {
         Long userId = UserContext.requireUserId();
+        bindPendingAttachments(userId, mailId, pendingIds);
+    }
+
+    public int bindPendingAttachments(Long userId, Long mailId, List<Long> pendingIds) {
         if (pendingIds == null || pendingIds.isEmpty()) {
-            return;
+            return 0;
         }
+        int bound = 0;
         for (Long pendingId : pendingIds) {
             PendingAttachment pending = pendingMapper.findOwnedPending(pendingId, userId);
             if (pending == null) {
@@ -120,8 +132,13 @@ public class AttachmentService {
             attachment.setSha256(pending.getSha256());
             attachment.setCreatedAt(LocalDateTime.now());
             mailAttachmentMapper.insert(attachment);
-            pendingMapper.deleteById(pendingId);
+            pending.setStatus("BOUND");
+            pending.setBoundMailId(mailId);
+            pending.setUpdatedAt(LocalDateTime.now());
+            pendingMapper.updateById(pending);
+            bound++;
         }
+        return bound;
     }
 
     public org.springframework.core.io.Resource download(Long attachmentId) {

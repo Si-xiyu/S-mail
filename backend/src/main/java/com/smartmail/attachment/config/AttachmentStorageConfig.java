@@ -11,9 +11,14 @@ import java.nio.file.Path;
 public class AttachmentStorageConfig {
 
     private final Path storagePath;
+    private final long maxFileSizeBytes;
 
-    public AttachmentStorageConfig(@Value("${smartmail.storage.attachment-path}") String path) {
+    public AttachmentStorageConfig(
+            @Value("${smartmail.attachment.storage-root:${smartmail.storage.attachment-path:./storage/attachments}}") String path,
+            @Value("${smartmail.attachment.max-file-size-bytes:52428800}") long maxFileSizeBytes
+    ) {
         this.storagePath = Path.of(path).toAbsolutePath().normalize();
+        this.maxFileSizeBytes = maxFileSizeBytes;
         try {
             Files.createDirectories(this.storagePath);
         } catch (IOException e) {
@@ -23,5 +28,9 @@ public class AttachmentStorageConfig {
 
     public Path getStoragePath() {
         return storagePath;
+    }
+
+    public long getMaxFileSizeBytes() {
+        return maxFileSizeBytes;
     }
 }
