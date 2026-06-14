@@ -29,3 +29,6 @@ smartmail:
     enabled: ${SMARTMAIL_AI_ENABLED:true}
     agent-base-url: ${SMARTMAIL_AGENT_BASE_URL:http://localhost:8000}
     timeout-seconds: 5
+  attachment:
+    storage-root: ${SMARTMAIL_ATTACHMENT_STORAGE_ROOT:storage/attachments}
+    max-file-size-bytes: ${SMARTMAIL_ATTACHMENT_MAX_FILE_SIZE_BYTES:26214400}

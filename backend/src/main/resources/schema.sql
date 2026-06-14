@@ -56,6 +56,49 @@ CREATE TABLE IF NOT EXISTS mail_attachment (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS pending_attachment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    uploader_id BIGINT NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    storage_path VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(128),
+    file_size BIGINT NOT NULL DEFAULT 0,
+    sha256 VARCHAR(128),
+    status VARCHAR(20) NOT NULL DEFAULT 'UPLOADED',
+    bound_mail_id BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_category (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    color VARCHAR(32) NOT NULL,
+    system_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_category_assignment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    mail_id BIGINT NOT NULL,
+    category_id BIGINT NOT NULL,
+    source VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_setting (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL UNIQUE,
+    ai_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    agent_auto_write_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS mail_ai_result (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     mail_id BIGINT NOT NULL,
@@ -70,3 +113,7 @@ CREATE TABLE IF NOT EXISTS mail_ai_result (
 CREATE INDEX IF NOT EXISTS idx_mailbox_user_folder ON mailbox_item(user_id, folder, deleted_flag);
 CREATE INDEX IF NOT EXISTS idx_recipient_mail ON mail_recipient(mail_id);
 CREATE INDEX IF NOT EXISTS idx_ai_mail_user_type ON mail_ai_result(mail_id, user_id, result_type);
+CREATE INDEX IF NOT EXISTS idx_pending_uploader_status ON pending_attachment(uploader_id, status);
+CREATE INDEX IF NOT EXISTS idx_attachment_mail ON mail_attachment(mail_id);
+CREATE INDEX IF NOT EXISTS idx_category_user_name ON mail_category(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_category_assignment_user_mail ON mail_category_assignment(user_id, mail_id);
