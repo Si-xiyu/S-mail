@@ -105,6 +105,10 @@ public class InternalToolService {
     }
 
     public void saveAiResult(SaveAiResultRequest request) {
+        MailboxItem item = mailboxMapper.findVisibleByUserAndMail(request.userId(), request.mailId());
+        if (item == null) {
+            throw new BusinessException(404, "Mailbox item not found");
+        }
         MailAiResult result = new MailAiResult();
         result.setMailId(request.mailId());
         result.setUserId(request.userId());

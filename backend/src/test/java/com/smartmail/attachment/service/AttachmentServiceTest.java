@@ -64,4 +64,29 @@ class AttachmentServiceTest {
         assertThatThrownBy(() -> attachmentService.upload(file))
                 .isInstanceOf(BusinessException.class);
     }
+
+    @Test
+    void bindRejectsAnotherUsersPendingAttachment() {
+        UserContext.set(new CurrentUser(101L, "sender@smartmail.local", "Sender"));
+        MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", "hello".getBytes());
+        PendingAttachmentResponse uploaded = attachmentService.upload(file);
+
+        assertThatThrownBy(() -> attachmentService.bindPendingAttachments(202L, 9002L, List.of(uploaded.pendingAttachmentId())))
+                .isInstanceOf(BusinessException.class);
+        assertThat(attachmentMapper.listByMailId(9002L)).isEmpty();
+    }
+
+    @Test
+    void bindRejectsSamePendingAttachmentTwice() {
+        UserContext.set(new CurrentUser(101L, "sender@smartmail.local", "Sender"));
+        MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", "hello".getBytes());
+        PendingAttachmentResponse uploaded = attachmentService.upload(file);
+
+        attachmentService.bindPendingAttachments(101L, 9003L, List.of(uploaded.pendingAttachmentId()));
+
+        assertThatThrownBy(() -> attachmentService.bindPendingAttachments(101L, 9004L, List.of(uploaded.pendingAttachmentId())))
+                .isInstanceOf(BusinessException.class);
+        assertThat(attachmentMapper.listByMailId(9003L)).hasSize(1);
+        assertThat(attachmentMapper.listByMailId(9004L)).isEmpty();
+    }
 }

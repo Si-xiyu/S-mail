@@ -93,6 +93,7 @@ public class WorkspaceService {
         // Determine folder and query strategy
         List<MailboxItem> items;
         long total;
+        boolean mapperPaged = false;
         if ("today".equals(view)) {
             LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
             items = mailboxItemMapper.listToday(userId, startOfDay);
@@ -108,6 +109,7 @@ public class WorkspaceService {
             long offset = (page - 1) * pageSize;
             items = mailboxItemMapper.listByFolder(userId, folder, pageSize, offset);
             total = mailboxItemMapper.countByFolder(userId, folder);
+            mapperPaged = true;
         }
 
         // If category filter, narrow by category assignments
@@ -140,8 +142,8 @@ public class WorkspaceService {
             total = items.size();
         }
 
-        // Apply pagination for non-smart views
-        if (!List.of("today", "important", "unread").contains(view)) {
+        // Smart views are loaded in memory; folder views are already paged by the mapper.
+        if (!mapperPaged) {
             long offset = (page - 1) * pageSize;
             int from = (int) offset;
             int to = Math.min(from + (int) pageSize, items.size());
@@ -207,7 +209,7 @@ public class WorkspaceService {
     public MailItemDetailResponse getMailItemDetail(Long itemId) {
         Long userId = UserContext.requireUserId();
         MailboxItem item = mailboxItemMapper.selectById(itemId);
-        if (item == null || !item.getUserId().equals(userId)) {
+        if (item == null || !item.getUserId().equals(userId) || Boolean.TRUE.equals(item.getDeletedFlag())) {
             throw new BusinessException(404, "邮件不存在或无权访问");
         }
 

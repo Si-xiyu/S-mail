@@ -20,7 +20,7 @@ ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any], str]] = {
     "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}, "Move to junk"),
     "MARK_READ": ("MARK_READ", {"read": True}, "Mark as read"),
     "SET_PRIORITY": ("SET_PRIORITY", {"priority": "HIGH"}, "Set priority: HIGH"),
-    "SET_CATEGORY": ("SET_CATEGORY", {"category": "FOLLOW_UP"}, "Set category: FOLLOW_UP"),
+    "SET_CATEGORY": ("SET_CATEGORY", {}, "Set category"),
 }
 
 
@@ -57,6 +57,15 @@ class ToolRouter:
                 message=f"Unsupported action type: {request.type}.",
             )
 
+        payload = _normalized_action_payload(request.payload)
+        if request.type == "SET_CATEGORY" and payload.get("categoryId") is None:
+            return ConfirmedActionExecuteResponse(
+                status="REJECTED",
+                actionId=request.action_id,
+                execution="NONE",
+                message="categoryId is required for SET_CATEGORY.",
+            )
+
         if not request.confirmed and not _auto_write_enabled(request.tool_policy):
             return ConfirmedActionExecuteResponse(
                 status="REJECTED",
@@ -72,12 +81,25 @@ class ToolRouter:
             backendOperation=BackendOperation(
                 method="POST",
                 path=BACKEND_ACTION_EXECUTE_PATH,
-                payload=_normalized_action_payload(request.payload),
+                payload=payload,
             ),
             message="Action confirmed; backend execution is required.",
         )
 
     def _handle_current_mail(self, request: PluginChatRequest) -> PluginChatResponse:
+        action_type, _, _ = _detect_action(request.message)
+        if action_type is not None:
+            if _mail_item_id_from_context(request.context) is None:
+                return PluginChatResponse(
+                    status="FAILED",
+                    answer="mailItemId is required before preparing a backend mail action.",
+                )
+            if action_type == "SET_CATEGORY" and _category_id_from_context(request.context) is None:
+                return PluginChatResponse(
+                    status="FAILED",
+                    answer="categoryId is required before preparing a SET_CATEGORY action.",
+                )
+
         pending_actions = self._mail_action_tool(request)
         if pending_actions:
             return PluginChatResponse(
@@ -139,8 +161,9 @@ class ToolRouter:
         )
         mail_item_id = _mail_item_id_from_context(request.context)
         full_payload = {**payload}
-        if mail_item_id is not None:
-            full_payload["mailItemId"] = mail_item_id
+        full_payload["mailItemId"] = mail_item_id
+        if action_type == "SET_CATEGORY":
+            full_payload["categoryId"] = _category_id_from_context(request.context)
         full_payload["userId"] = request.user_id
         return [
             PendingAction(
@@ -181,6 +204,10 @@ def _detect_action(message: str) -> tuple[Any, dict[str, Any], str | None]:
 
 def _mail_item_id_from_context(context: dict[str, Any]) -> Any:
     return context.get("mailItemId") or context.get("mail_item_id") or context.get("mailId") or context.get("mail_id")
+
+
+def _category_id_from_context(context: dict[str, Any]) -> Any:
+    return context.get("categoryId") or context.get("category_id")
 
 
 def _normalized_action_payload(payload: dict[str, Any]) -> dict[str, Any]:

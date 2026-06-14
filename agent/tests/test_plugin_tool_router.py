@@ -81,6 +81,38 @@ class ToolRouterTest(unittest.TestCase):
         self.assertEqual(response.pending_actions[0].execution, "BACKEND_REQUIRED")
         self.assertEqual(response.pending_actions[0].payload["mailItemId"], 7)
 
+    def test_write_request_without_mail_item_context_is_rejected_before_backend_delegation(self) -> None:
+        response = self.router.chat(
+            PluginChatRequest(
+                sessionId="s1",
+                userId=1,
+                scope="CURRENT_MAIL",
+                message="Set priority to high",
+                context={},
+                toolPolicy={"agentAutoWriteEnabled": False},
+            )
+        )
+
+        self.assertEqual(response.status, "FAILED")
+        self.assertEqual(response.pending_actions, [])
+
+    def test_set_category_action_payload_uses_backend_category_id_contract(self) -> None:
+        response = self.router.chat(
+            PluginChatRequest(
+                sessionId="s1",
+                userId=1,
+                scope="CURRENT_MAIL",
+                message="Set category",
+                context={"mailItemId": 7, "categoryId": 12},
+                toolPolicy={"agentAutoWriteEnabled": False},
+            )
+        )
+
+        self.assertEqual(response.status, "SUCCEEDED")
+        self.assertEqual(response.pending_actions[0].type, "SET_CATEGORY")
+        self.assertEqual(response.pending_actions[0].payload["categoryId"], 12)
+        self.assertNotIn("category", response.pending_actions[0].payload)
+
 
 class BackendToolClientTest(unittest.TestCase):
     def setUp(self) -> None:

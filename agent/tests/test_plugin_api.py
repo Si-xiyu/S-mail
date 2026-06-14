@@ -363,6 +363,24 @@ class PluginApiTests(unittest.TestCase):
         self.assertEqual(body["execution"], "NONE")
         self.assertIsNone(body["backendOperation"])
 
+    def test_execute_set_category_without_category_id_is_rejected_before_backend_delegation(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/actions/execute",
+            json={
+                "actionId": "s1:88:SET_CATEGORY",
+                "userId": 1,
+                "confirmed": True,
+                "type": "SET_CATEGORY",
+                "payload": {"mailItemId": 88, "category": "FOLLOW_UP"},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "REJECTED")
+        self.assertEqual(body["execution"], "NONE")
+        self.assertIsNone(body["backendOperation"])
+
 
 if __name__ == "__main__":
     unittest.main()
