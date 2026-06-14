@@ -39,17 +39,17 @@
 mvn clean test
 ```
 
-结果：失败。
+最新结果：新增搜索边界测试后失败。
 
 通过：
 
 - `AttachmentServiceTest`: 4/4 passed
+- `InternalToolServiceSecurityTest`: 2/2 passed
+- `WorkspaceServiceBehaviorTest`: 2/2 passed
 
 失败：
 
-- `InternalToolServiceSecurityTest.saveAiResultRejectsMailUserPairWithoutVisibleMailboxItem`
-- `WorkspaceServiceBehaviorTest.listMailItemsSecondPageKeepsMapperPageInsteadOfPaginatingTwice`
-- `WorkspaceServiceBehaviorTest.getMailItemDetailRejectsDeletedMailboxItem`
+- `SearchServiceBehaviorTest.searchNormalizesFolderAndPaginationLikeMailboxList`
 
 ### Agent
 
@@ -59,19 +59,17 @@ mvn clean test
 E:\software\Miniconda\python.exe -m pytest
 ```
 
-结果：失败。
+最新结果：通过。
 
-通过：25
+通过：28
 
-失败：
-
-- `PluginApiTests.test_execute_set_category_without_category_id_is_rejected_before_backend_delegation`
-- `ToolRouterTest.test_set_category_action_payload_uses_backend_category_id_contract`
-- `ToolRouterTest.test_write_request_without_mail_item_context_is_rejected_before_backend_delegation`
+失败：无
 
 说明：直接运行 `python -m pytest` 时，本机 `python.exe` 指向 WindowsApps 占位程序，会报“指定的登录会话不存在”。使用 `E:\software\Miniconda\python.exe` 可以稳定运行。
 
 ## 发现的问题
+
+说明：问题 1-5 已由 `aebec8d 修复 main-test 契约测试发现` 修复，并在本轮回归中通过。问题 6 是本轮继续审查新增发现，当前仍有失败测试覆盖。
 
 ### 1. Workspace 普通文件夹列表存在二次分页
 
@@ -169,6 +167,27 @@ E:\software\Miniconda\python.exe -m pytest
 - Tool Router 从上下文或前端选择中携带 `categoryId`。
 - `/actions/execute` 对 `SET_CATEGORY` 缺少 `categoryId` 的请求直接 `REJECTED`。
 
+### 6. SearchService 没有规范 folder 和分页参数
+
+风险等级：中
+
+现象：
+
+- `SearchService.search("project", "inbox", 0, 500)` 会把 `folder="inbox"` 原样传给 Mapper。
+- `page=0` 会计算出 `offset=-500`。
+- `pageSize=500` 会原样传到底层 SQL。
+
+影响：
+
+- 用户传小写 `folder=inbox` 时可能查不到数据，因为数据库中 folder 使用 `INBOX`。
+- 负 offset 或超大 limit 会导致 SQL 行为不稳定，和 `MailboxService.list` 已有的 `page/pageSize` 防御不一致。
+
+建议：
+
+- `folder` 统一 `trim().toUpperCase()`，空值表示不按文件夹过滤或按产品约定默认 `INBOX`。
+- `page` 至少为 1，`pageSize` 限制在 1 到 50。
+- 对空白 keyword 给出 400，或明确实现“列出全部”的产品语义。
+
 ## 已确认通过的边界
 
 - Pending Attachment 不能被其他用户绑定。
@@ -183,7 +202,6 @@ E:\software\Miniconda\python.exe -m pytest
 
 ## 建议优先级
 
-1. 先修复 Workspace 二次分页与已删除详情可读问题，影响主工作台体验和数据隐藏边界。
-2. 修复 Internal Tool `saveAiResult` 权限校验，避免 Agent 写回污染用户隔离。
-3. 修复 Agent 写操作生成与执行前校验，确保 pending action 都是后端可执行、用户可理解的操作。
-4. 后续补充 Controller 层集成测试，覆盖 token 鉴权、跨用户访问、附件下载权限、Workspace API 全链路。
+1. 修复 SearchService 的 folder 规范化和分页参数防御。
+2. 后续补充 Controller 层集成测试，覆盖 token 鉴权、跨用户访问、附件下载权限、Workspace API 全链路。
+3. 补充搜索接口集成测试，验证 `folder=inbox`、空 keyword、page/pageSize 边界和搜索结果分页。

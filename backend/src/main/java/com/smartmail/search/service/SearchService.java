@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -21,13 +22,16 @@ public class SearchService {
 
     public PageResponse<SearchResultResponse> search(String keyword, String folder, long page, long pageSize) {
         Long userId = UserContext.requireUserId();
-        String likeKeyword = "%" + keyword.trim() + "%";
-        long offset = (page - 1) * pageSize;
+        String likeKeyword = "%" + (keyword == null ? "" : keyword.trim()) + "%";
+        String normalizedFolder = normalizeFolder(folder);
+        long safePage = Math.max(page, 1);
+        long safeSize = Math.min(Math.max(pageSize, 1), 50);
+        long offset = (safePage - 1) * safeSize;
 
         List<Map<String, Object>> rows = mailboxItemMapper.searchByKeyword(
-                userId, likeKeyword, folder != null ? folder : null, pageSize, offset);
+                userId, likeKeyword, normalizedFolder, safeSize, offset);
         long total = mailboxItemMapper.countByKeyword(userId, likeKeyword,
-                folder != null ? folder : null);
+                normalizedFolder);
 
         List<SearchResultResponse> records = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -36,7 +40,7 @@ public class SearchService {
                     toLong(row.get("MAIL_ID")),
                     (String) row.get("SENDER_EMAIL"),
                     (String) row.get("SUBJECT"),
-                    snippet((String) row.get("CONTENT_TEXT"), keyword),
+                    snippet((String) row.get("CONTENT_TEXT"), keyword == null ? "" : keyword),
                     (String) row.get("FOLDER"),
                     toBoolean(row.get("READ_FLAG")),
                     toBoolean(row.get("STAR_FLAG")),
@@ -45,7 +49,11 @@ public class SearchService {
                     toLocalDateTime(row.get("RECEIVED_AT"))
             ));
         }
-        return new PageResponse<>(records, total, page, pageSize);
+        return new PageResponse<>(records, total, safePage, safeSize);
+    }
+
+    private String normalizeFolder(String folder) {
+        return folder == null || folder.isBlank() ? null : folder.trim().toUpperCase(Locale.ROOT);
     }
 
     private String snippet(String body, String keyword) {
