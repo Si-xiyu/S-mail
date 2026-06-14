@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS mail_message (
     sender_id BIGINT NOT NULL,
     sender_email VARCHAR(128) NOT NULL,
     subject VARCHAR(255) NOT NULL,
-    content_text CLOB,
-    content_html CLOB,
+    content_text TEXT,
+    content_html TEXT,
     has_attachment BOOLEAN NOT NULL DEFAULT FALSE,
     sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -61,8 +61,50 @@ CREATE TABLE IF NOT EXISTS mail_ai_result (
     mail_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     result_type VARCHAR(40) NOT NULL,
-    result_json CLOB NOT NULL,
+    result_json TEXT NOT NULL,
     status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pending_attachment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    uploader_id BIGINT NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    storage_path VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(128),
+    file_size BIGINT NOT NULL DEFAULT 0,
+    sha256 VARCHAR(128),
+    status VARCHAR(20) NOT NULL DEFAULT 'UPLOADED',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_category (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(64) NOT NULL,
+    color VARCHAR(20) NOT NULL DEFAULT '#64748b',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mail_category_assignment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    category_id BIGINT NOT NULL,
+    mail_id BIGINT NOT NULL,
+    assignment_source VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ai_analysis_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    mail_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    task_type VARCHAR(40) NOT NULL DEFAULT 'FULL_ANALYSIS',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    retry_count INT NOT NULL DEFAULT 0,
+    error_message VARCHAR(500),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -70,3 +112,10 @@ CREATE TABLE IF NOT EXISTS mail_ai_result (
 CREATE INDEX IF NOT EXISTS idx_mailbox_user_folder ON mailbox_item(user_id, folder, deleted_flag);
 CREATE INDEX IF NOT EXISTS idx_recipient_mail ON mail_recipient(mail_id);
 CREATE INDEX IF NOT EXISTS idx_ai_mail_user_type ON mail_ai_result(mail_id, user_id, result_type);
+CREATE INDEX IF NOT EXISTS idx_pending_uploader ON pending_attachment(uploader_id, status);
+CREATE INDEX IF NOT EXISTS idx_category_user ON mail_category(user_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_task_pending ON ai_analysis_task(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_analysis_task_mail_user ON ai_analysis_task(mail_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_category ON mail_category_assignment(category_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_mail ON mail_category_assignment(mail_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_unique ON mail_category_assignment(category_id, mail_id);

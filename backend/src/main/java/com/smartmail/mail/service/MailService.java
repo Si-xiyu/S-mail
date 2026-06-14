@@ -2,6 +2,8 @@ package com.smartmail.mail.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.smartmail.ai.mapper.MailAiResultMapper;
+import com.smartmail.analysis.service.AnalysisService;
+import com.smartmail.attachment.service.AttachmentService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.CurrentUser;
 import com.smartmail.common.security.UserContext;
@@ -33,19 +35,25 @@ public class MailService {
     private final MailboxItemMapper mailboxMapper;
     private final SysUserMapper userMapper;
     private final MailAiResultMapper aiResultMapper;
+    private final AttachmentService attachmentService;
+    private final AnalysisService analysisService;
 
     public MailService(
             MailMessageMapper mailMapper,
             MailRecipientMapper recipientMapper,
             MailboxItemMapper mailboxMapper,
             SysUserMapper userMapper,
-            MailAiResultMapper aiResultMapper
+            MailAiResultMapper aiResultMapper,
+            AttachmentService attachmentService,
+            AnalysisService analysisService
     ) {
         this.mailMapper = mailMapper;
         this.recipientMapper = recipientMapper;
         this.mailboxMapper = mailboxMapper;
         this.userMapper = userMapper;
         this.aiResultMapper = aiResultMapper;
+        this.attachmentService = attachmentService;
+        this.analysisService = analysisService;
     }
 
     @Transactional
@@ -73,6 +81,8 @@ public class MailService {
         if (request.cc() != null) {
             allRecipients.addAll(request.cc());
         }
+        List<String> delivered = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
         for (String rawEmail : allRecipients) {
             String email = rawEmail.trim().toLowerCase();
             SysUser recipientUser = userMapper.findByEmail(email);
@@ -86,9 +96,18 @@ public class MailService {
             recipientMapper.insert(recipient);
             if (recipientUser != null) {
                 createMailboxItem(recipientUser.getId(), message.getId(), "INBOX", false, now);
+                analysisService.createTask(message.getId(), recipientUser.getId());
+                delivered.add(email);
+            } else {
+                failed.add(email);
             }
         }
-        return new MailSendResponse(message.getId(), message.getMessageNo());
+        if (request.pendingAttachmentIds() != null && !request.pendingAttachmentIds().isEmpty()) {
+            attachmentService.bindToMail(message.getId(), request.pendingAttachmentIds());
+            message.setHasAttachment(true);
+            mailMapper.updateById(message);
+        }
+        return new MailSendResponse(message.getId(), message.getMessageNo(), delivered, failed);
     }
 
     public MailDetailResponse detail(Long mailId) {

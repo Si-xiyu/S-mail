@@ -3,6 +3,7 @@ package com.smartmail.auth.service;
 import com.smartmail.auth.dto.AuthResponse;
 import com.smartmail.auth.dto.LoginRequest;
 import com.smartmail.auth.dto.RegisterRequest;
+import com.smartmail.category.service.CategoryService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.TokenService;
 import com.smartmail.user.entity.SysUser;
@@ -17,11 +18,13 @@ public class AuthService {
     private final SysUserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
+    private final CategoryService categoryService;
 
-    public AuthService(SysUserMapper userMapper, PasswordEncoder passwordEncoder, TokenService tokenService) {
+    public AuthService(SysUserMapper userMapper, PasswordEncoder passwordEncoder, TokenService tokenService, CategoryService categoryService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
+        this.categoryService = categoryService;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -36,6 +39,7 @@ public class AuthService {
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.insert(user);
+        categoryService.ensureDefaultCategories(user.getId());
         return toAuthResponse(user);
     }
 

@@ -1,3 +1,4 @@
+# H2 开发环境配置 - 无需安装 MySQL
 spring:
   datasource:
     url: jdbc:h2:mem:smartmail;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
@@ -10,7 +11,23 @@ spring:
   h2:
     console:
       enabled: true
+      path: /h2-console
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
 
 smartmail:
+  auth:
+    token-secret: smartmail-dev-secret-change-me
+    token-ttl-seconds: 86400
+  internal-token: smartmail-internal-dev-token
   ai:
-    enabled: true
+    enabled: false
+    agent-base-url: http://localhost:8000
+    timeout-seconds: 5
+  storage:
+    attachment-path: ./storage/attachments

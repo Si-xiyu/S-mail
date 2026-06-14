@@ -36,6 +36,10 @@ public class AiService {
 
     public AgentTaskResponse runMailTask(Long mailId, String task) {
         Long userId = UserContext.requireUserId();
+        return runMailTask(mailId, userId, task);
+    }
+
+    public AgentTaskResponse runMailTask(Long mailId, Long userId, String task) {
         if (!enabled) {
             return disabledResponse(task);
         }
