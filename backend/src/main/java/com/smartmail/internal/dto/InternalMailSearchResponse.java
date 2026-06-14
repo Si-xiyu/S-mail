@@ -1,17 +1,17 @@
 package com.smartmail.internal.dto;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
-public record InternalMailResponse(
+public record InternalMailSearchResponse(
         Long itemId,
         Long mailId,
-        Long userId,
         String folder,
         String senderEmail,
         String subject,
-        String contentText,
-        String contentHtml,
+        String preview,
         String priority,
-        List<String> recipients
+        Boolean read,
+        Boolean starred,
+        LocalDateTime receivedAt
 ) {
 }

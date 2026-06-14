@@ -1,6 +1,7 @@
 package com.smartmail.mail.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.smartmail.ai.service.AnalysisTaskService;
 import com.smartmail.ai.mapper.MailAiResultMapper;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.CurrentUser;
@@ -33,19 +34,22 @@ public class MailService {
     private final MailboxItemMapper mailboxMapper;
     private final SysUserMapper userMapper;
     private final MailAiResultMapper aiResultMapper;
+    private final AnalysisTaskService analysisTaskService;
 
     public MailService(
             MailMessageMapper mailMapper,
             MailRecipientMapper recipientMapper,
             MailboxItemMapper mailboxMapper,
             SysUserMapper userMapper,
-            MailAiResultMapper aiResultMapper
+            MailAiResultMapper aiResultMapper,
+            AnalysisTaskService analysisTaskService
     ) {
         this.mailMapper = mailMapper;
         this.recipientMapper = recipientMapper;
         this.mailboxMapper = mailboxMapper;
         this.userMapper = userMapper;
         this.aiResultMapper = aiResultMapper;
+        this.analysisTaskService = analysisTaskService;
     }
 
     @Transactional
@@ -85,7 +89,8 @@ public class MailService {
             recipient.setCreatedAt(now);
             recipientMapper.insert(recipient);
             if (recipientUser != null) {
-                createMailboxItem(recipientUser.getId(), message.getId(), "INBOX", false, now);
+                MailboxItem item = createMailboxItem(recipientUser.getId(), message.getId(), "INBOX", false, now);
+                analysisTaskService.enqueuePending(recipientUser.getId(), item.getId(), message.getId());
             }
         }
         return new MailSendResponse(message.getId(), message.getMessageNo());
@@ -130,7 +135,7 @@ public class MailService {
         );
     }
 
-    private void createMailboxItem(Long userId, Long mailId, String folder, boolean read, LocalDateTime now) {
+    private MailboxItem createMailboxItem(Long userId, Long mailId, String folder, boolean read, LocalDateTime now) {
         MailboxItem item = new MailboxItem();
         item.setUserId(userId);
         item.setMailId(mailId);
@@ -142,5 +147,6 @@ public class MailService {
         item.setReceivedAt(now);
         item.setUpdatedAt(now);
         mailboxMapper.insert(item);
+        return item;
     }
 }
