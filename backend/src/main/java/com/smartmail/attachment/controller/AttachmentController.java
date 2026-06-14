@@ -8,20 +8,13 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/v1")
 public class AttachmentController {
+
     private final AttachmentService attachmentService;
 
     public AttachmentController(AttachmentService attachmentService) {
@@ -34,25 +27,23 @@ public class AttachmentController {
     }
 
     @DeleteMapping("/compose/attachments/{pendingAttachmentId}")
-    public ApiResponse<Void> deletePending(@PathVariable Long pendingAttachmentId) {
-        attachmentService.deletePending(pendingAttachmentId);
+    public ApiResponse<Void> removePending(@PathVariable Long pendingAttachmentId) {
+        attachmentService.removePending(pendingAttachmentId);
         return ApiResponse.ok();
     }
 
-    @GetMapping("/attachments/{attachmentId}/download")
-    public ResponseEntity<Resource> download(@PathVariable Long attachmentId) {
-        AttachmentService.DownloadFile download = attachmentService.loadForDownload(attachmentId);
-        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-        if (download.mimeType() != null) {
-            mediaType = MediaType.parseMediaType(download.mimeType());
+    @GetMapping("/attachments/{id}/download")
+    public ResponseEntity<Resource> download(@PathVariable Long id) {
+        Resource resource = attachmentService.download(id);
+        String mimeType = attachmentService.getMimeType(id);
+        if (mimeType == null) {
+            mimeType = "application/octet-stream";
         }
+        String filename = resource.getFilename() != null ? resource.getFilename() : "attachment";
         return ResponseEntity.ok()
-                .contentType(mediaType)
-                .contentLength(download.fileSize())
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(download.fileName(), StandardCharsets.UTF_8)
-                        .build()
-                        .toString())
-                .body(download.resource());
+                .contentType(MediaType.parseMediaType(mimeType))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(filename).build().toString())
+                .body(resource);
     }
 }

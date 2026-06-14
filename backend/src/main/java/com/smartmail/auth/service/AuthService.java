@@ -51,7 +51,7 @@ public class AuthService {
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.insert(user);
         settingService.ensure(user.getId());
-        categoryService.ensureDefaults(user.getId());
+        categoryService.ensureDefaultCategories(user.getId());
         return toAuthResponse(user);
     }
 

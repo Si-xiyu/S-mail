@@ -9,10 +9,11 @@ import java.util.List;
 
 @Mapper
 public interface MailAttachmentMapper extends BaseMapper<MailAttachment> {
+
     @Select("""
             SELECT * FROM mail_attachment
             WHERE mail_id = #{mailId}
-            ORDER BY id ASC
+            ORDER BY original_name
             """)
     List<MailAttachment> listByMailId(Long mailId);
 }

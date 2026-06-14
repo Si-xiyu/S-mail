@@ -1,5 +1,6 @@
 package com.smartmail.mailbox.service;
 
+import com.smartmail.category.service.CategoryService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.response.PageResponse;
 import com.smartmail.common.security.UserContext;
@@ -20,10 +21,13 @@ public class MailboxService {
 
     private final MailboxItemMapper mailboxMapper;
     private final MailMessageMapper mailMapper;
+    private final CategoryService categoryService;
 
-    public MailboxService(MailboxItemMapper mailboxMapper, MailMessageMapper mailMapper) {
+    public MailboxService(MailboxItemMapper mailboxMapper, MailMessageMapper mailMapper,
+                          CategoryService categoryService) {
         this.mailboxMapper = mailboxMapper;
         this.mailMapper = mailMapper;
+        this.categoryService = categoryService;
     }
 
     public PageResponse<MailboxItemResponse> list(String folder, long page, long pageSize) {
@@ -65,6 +69,20 @@ public class MailboxService {
         item.setFolder(targetFolder);
         item.setUpdatedAt(LocalDateTime.now());
         mailboxMapper.updateById(item);
+
+        com.smartmail.category.entity.MailCategory junkCat =
+                categoryService.findDefaultCategory(UserContext.requireUserId(), CategoryService.DEFAULT_JUNK);
+        com.smartmail.category.entity.MailCategory otherCat =
+                categoryService.findDefaultCategory(UserContext.requireUserId(), CategoryService.DEFAULT_OTHER);
+        if ("JUNK".equals(targetFolder) && junkCat != null) {
+            categoryService.assignCategory(item.getMailId(), junkCat.getId(), "MANUAL");
+        } else if ("INBOX".equals(targetFolder) && junkCat != null) {
+            com.smartmail.category.entity.MailCategory currentCat =
+                    categoryService.getCategoryForMail(item.getMailId(), UserContext.requireUserId());
+            if (currentCat != null && CategoryService.DEFAULT_JUNK.equals(currentCat.getName()) && otherCat != null) {
+                categoryService.assignCategory(item.getMailId(), otherCat.getId(), "MANUAL");
+            }
+        }
     }
 
     public void delete(Long itemId) {
@@ -76,6 +94,11 @@ public class MailboxService {
         }
         item.setUpdatedAt(LocalDateTime.now());
         mailboxMapper.updateById(item);
+    }
+
+    public void changeCategory(Long itemId, Long categoryId) {
+        MailboxItem item = requireOwnedItem(itemId);
+        categoryService.assignCategory(item.getMailId(), categoryId, "MANUAL");
     }
 
     private MailboxItemResponse toResponse(MailboxItem item) {

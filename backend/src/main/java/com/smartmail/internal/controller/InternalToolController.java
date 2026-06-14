@@ -105,6 +105,16 @@ public class InternalToolController {
         return ApiResponse.ok();
     }
 
+    @PostMapping("/mail-actions/execute")
+    public ApiResponse<Void> executeMailAction(
+            @RequestHeader("X-Internal-Token") String token,
+            @Valid @RequestBody InternalMailActionRequest request
+    ) {
+        verify(token);
+        internalToolService.executeAction(request);
+        return ApiResponse.ok();
+    }
+
     private void verify(String token) {
         if (!internalToken.equals(token)) {
             throw new BusinessException(403, "无效 internal token");

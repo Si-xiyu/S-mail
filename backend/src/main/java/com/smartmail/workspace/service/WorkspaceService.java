@@ -1,9 +1,14 @@
 package com.smartmail.workspace.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.smartmail.ai.entity.MailAiResult;
 import com.smartmail.ai.mapper.MailAiResultMapper;
-import com.smartmail.ai.service.AnalysisTaskService;
+import com.smartmail.attachment.dto.AttachmentResponse;
+import com.smartmail.attachment.entity.MailAttachment;
+import com.smartmail.attachment.mapper.MailAttachmentMapper;
+import com.smartmail.category.entity.MailCategory;
+import com.smartmail.category.entity.MailCategoryAssignment;
+import com.smartmail.category.mapper.MailCategoryAssignmentMapper;
+import com.smartmail.category.mapper.MailCategoryMapper;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.response.PageResponse;
 import com.smartmail.common.security.UserContext;
@@ -13,224 +18,360 @@ import com.smartmail.mail.mapper.MailMessageMapper;
 import com.smartmail.mail.mapper.MailRecipientMapper;
 import com.smartmail.mailbox.entity.MailboxItem;
 import com.smartmail.mailbox.mapper.MailboxItemMapper;
-import com.smartmail.workspace.dto.WorkspaceAgentResponse;
-import com.smartmail.workspace.dto.WorkspaceAnalysisResponse;
-import com.smartmail.workspace.dto.WorkspaceAttachmentResponse;
-import com.smartmail.workspace.dto.WorkspaceCategoryResponse;
-import com.smartmail.workspace.dto.WorkspaceCountResponse;
-import com.smartmail.workspace.dto.WorkspaceMailDetailResponse;
-import com.smartmail.workspace.dto.WorkspaceMailItemResponse;
-import com.smartmail.workspace.dto.WorkspaceViewsResponse;
+import com.smartmail.workspace.dto.*;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class WorkspaceService {
-    private final MailboxItemMapper mailboxMapper;
-    private final MailMessageMapper mailMapper;
+
+    private final MailboxItemMapper mailboxItemMapper;
+    private final MailMessageMapper mailMessageMapper;
     private final MailRecipientMapper recipientMapper;
     private final MailAiResultMapper aiResultMapper;
-    private final AnalysisTaskService analysisTaskService;
+    private final MailCategoryMapper categoryMapper;
+    private final MailCategoryAssignmentMapper assignmentMapper;
+    private final MailAttachmentMapper mailAttachmentMapper;
 
     public WorkspaceService(
-            MailboxItemMapper mailboxMapper,
-            MailMessageMapper mailMapper,
+            MailboxItemMapper mailboxItemMapper,
+            MailMessageMapper mailMessageMapper,
             MailRecipientMapper recipientMapper,
             MailAiResultMapper aiResultMapper,
-            AnalysisTaskService analysisTaskService
+            MailCategoryMapper categoryMapper,
+            MailCategoryAssignmentMapper assignmentMapper,
+            MailAttachmentMapper mailAttachmentMapper
     ) {
-        this.mailboxMapper = mailboxMapper;
-        this.mailMapper = mailMapper;
+        this.mailboxItemMapper = mailboxItemMapper;
+        this.mailMessageMapper = mailMessageMapper;
         this.recipientMapper = recipientMapper;
         this.aiResultMapper = aiResultMapper;
-        this.analysisTaskService = analysisTaskService;
+        this.categoryMapper = categoryMapper;
+        this.assignmentMapper = assignmentMapper;
+        this.mailAttachmentMapper = mailAttachmentMapper;
     }
 
-    public WorkspaceViewsResponse views() {
+    public WorkspaceViewsResponse getViews() {
         Long userId = UserContext.requireUserId();
-        List<WorkspaceCountResponse> views = List.of(
-                new WorkspaceCountResponse("today", "Today", mailboxMapper.countToday(userId, LocalDate.now().atStartOfDay())),
-                new WorkspaceCountResponse("important", "Important", mailboxMapper.countImportant(userId)),
-                new WorkspaceCountResponse("unread", "Unread", mailboxMapper.countUnread(userId)),
-                new WorkspaceCountResponse("junk", "Junk", mailboxMapper.countByFolder(userId, "JUNK"))
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+
+        // Smart views
+        List<ViewItem> views = List.of(
+                new ViewItem("today", "Today", mailboxItemMapper.countToday(userId, startOfDay)),
+                new ViewItem("important", "Important", mailboxItemMapper.countImportant(userId)),
+                new ViewItem("unread", "Unread", mailboxItemMapper.countUnreadByFolder(userId, "INBOX")),
+                new ViewItem("junk", "Junk", mailboxItemMapper.countByFolder(userId, "JUNK"))
         );
-        List<WorkspaceCountResponse> folders = List.of(
-                new WorkspaceCountResponse("inbox", "Inbox", mailboxMapper.countByFolder(userId, "INBOX")),
-                new WorkspaceCountResponse("sent", "Sent", mailboxMapper.countByFolder(userId, "SENT")),
-                new WorkspaceCountResponse("drafts", "Drafts", 0),
-                new WorkspaceCountResponse("trash", "Trash", mailboxMapper.countByFolder(userId, "TRASH"))
+
+        // Folders
+        List<FolderItem> folders = List.of(
+                new FolderItem("inbox", "Inbox", mailboxItemMapper.countByFolder(userId, "INBOX")),
+                new FolderItem("sent", "Sent", mailboxItemMapper.countByFolder(userId, "SENT")),
+                new FolderItem("drafts", "Drafts", mailboxItemMapper.countByFolder(userId, "DRAFTS")),
+                new FolderItem("trash", "Trash", mailboxItemMapper.countByFolder(userId, "TRASH"))
         );
-        return new WorkspaceViewsResponse(views, folders, List.of());
+
+        // Categories
+        List<MailCategory> categories = categoryMapper.listByUser(userId);
+        List<CategoryItem> categoryItems = new ArrayList<>();
+        for (MailCategory c : categories) {
+            long count = assignmentMapper.countByCategory(c.getId(), userId);
+            categoryItems.add(new CategoryItem(c.getId(), c.getName(), c.getColor(), count));
+        }
+
+        return new WorkspaceViewsResponse(views, folders, categoryItems);
     }
 
-    public PageResponse<WorkspaceMailItemResponse> list(String view, Long categoryId, String keyword, long page, long pageSize) {
+    public PageResponse<MailItemBriefResponse> listMailItems(
+            String view, Long categoryId, String keyword, long page, long pageSize) {
         Long userId = UserContext.requireUserId();
-        long safePage = Math.max(page, 1);
-        long safeSize = Math.min(Math.max(pageSize, 1), 50);
-        List<MailboxItem> candidates = mailboxMapper.listVisibleByUser(userId);
-        List<MailboxItem> filtered = candidates.stream()
-                .filter(item -> matchesView(item, normalizeView(view)))
-                .filter(item -> categoryId == null)
-                .filter(item -> matchesKeyword(item, keyword))
-                .sorted(Comparator.comparing(MailboxItem::getReceivedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-                .toList();
-        int from = (int) Math.min((safePage - 1) * safeSize, filtered.size());
-        int to = (int) Math.min(from + safeSize, filtered.size());
-        List<WorkspaceMailItemResponse> records = filtered.subList(from, to).stream()
-                .map(this::toItemResponse)
-                .toList();
-        return new PageResponse<>(records, filtered.size(), safePage, safeSize);
+
+        // Determine folder and query strategy
+        List<MailboxItem> items;
+        long total;
+        if ("today".equals(view)) {
+            LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+            items = mailboxItemMapper.listToday(userId, startOfDay);
+            total = items.size();
+        } else if ("important".equals(view)) {
+            items = mailboxItemMapper.listImportant(userId);
+            total = items.size();
+        } else if ("unread".equals(view)) {
+            items = mailboxItemMapper.listUnread(userId);
+            total = items.size();
+        } else {
+            String folder = mapViewToFolder(view);
+            long offset = (page - 1) * pageSize;
+            items = mailboxItemMapper.listByFolder(userId, folder, pageSize, offset);
+            total = mailboxItemMapper.countByFolder(userId, folder);
+        }
+
+        // If category filter, narrow by category assignments
+        if (categoryId != null) {
+            List<Long> mailIdsInCategory = assignmentMapper.listMailIdsByCategory(categoryId, userId);
+            Set<Long> mailIdsSet = new HashSet<>(mailIdsInCategory);
+            items = items.stream()
+                    .filter(it -> mailIdsSet.contains(it.getMailId()))
+                    .collect(Collectors.toList());
+            total = items.size();
+        }
+
+        // If keyword filter, narrow by keyword in subject/body
+        if (keyword != null && !keyword.isBlank()) {
+            String lowerKw = keyword.toLowerCase();
+            Set<Long> matchingMailIds = new HashSet<>();
+            for (MailboxItem it : items) {
+                MailMessage msg = mailMessageMapper.selectById(it.getMailId());
+                if (msg != null && (
+                        (msg.getSubject() != null && msg.getSubject().toLowerCase().contains(lowerKw)) ||
+                                (msg.getSenderEmail() != null && msg.getSenderEmail().toLowerCase().contains(lowerKw)) ||
+                                (msg.getContentText() != null && msg.getContentText().toLowerCase().contains(lowerKw))
+                )) {
+                    matchingMailIds.add(it.getMailId());
+                }
+            }
+            items = items.stream()
+                    .filter(it -> matchingMailIds.contains(it.getMailId()))
+                    .collect(Collectors.toList());
+            total = items.size();
+        }
+
+        // Apply pagination for non-smart views
+        if (!List.of("today", "important", "unread").contains(view)) {
+            long offset = (page - 1) * pageSize;
+            int from = (int) offset;
+            int to = Math.min(from + (int) pageSize, items.size());
+            if (from >= items.size()) {
+                items = List.of();
+            } else {
+                items = items.subList(from, to);
+            }
+        }
+
+        // Assemble responses
+        List<MailItemBriefResponse> records = new ArrayList<>();
+        Set<Long> mailIds = items.stream().map(MailboxItem::getMailId).collect(Collectors.toSet());
+        Map<Long, MailMessage> messageMap = loadMessages(mailIds);
+        Map<Long, MailAiResult> latestAiMap = loadLatestAiResults(mailIds, userId);
+        Map<Long, MailCategory> categoryMap = loadCategories(mailIds, userId);
+
+        for (MailboxItem item : items) {
+            MailMessage msg = messageMap.get(item.getMailId());
+            if (msg == null) continue;
+
+            MailAiResult aiResult = latestAiMap.get(item.getMailId());
+            String summaryPreview = "";
+            String analysisStatus = "PENDING";
+            if (aiResult != null) {
+                analysisStatus = aiResult.getStatus();
+                String json = aiResult.getResultJson();
+                if (json != null && json.contains("summary")) {
+                    summaryPreview = extractSummaryPreview(json);
+                }
+            }
+            if (summaryPreview.isEmpty()) {
+                summaryPreview = msg.getContentText() != null
+                        ? (msg.getContentText().length() > 80 ? msg.getContentText().substring(0, 80) + "..." : msg.getContentText())
+                        : "";
+            }
+
+            MailCategory cat = categoryMap.get(item.getMailId());
+            MailItemBriefResponse.CategoryBrief catBrief = cat != null
+                    ? new MailItemBriefResponse.CategoryBrief(cat.getId(), cat.getName(), cat.getColor())
+                    : new MailItemBriefResponse.CategoryBrief(null, "Other", "#64748b");
+
+            records.add(new MailItemBriefResponse(
+                    item.getId(),
+                    item.getMailId(),
+                    item.getFolder(),
+                    msg.getSenderEmail(),
+                    msg.getSubject(),
+                    summaryPreview,
+                    catBrief,
+                    analysisStatus,
+                    item.getReadFlag(),
+                    item.getStarFlag(),
+                    item.getPriority(),
+                    msg.getHasAttachment(),
+                    item.getReceivedAt()
+            ));
+        }
+
+        return new PageResponse<>(records, total, page, pageSize);
     }
 
-    public WorkspaceMailDetailResponse detail(Long itemId) {
+    public MailItemDetailResponse getMailItemDetail(Long itemId) {
         Long userId = UserContext.requireUserId();
-        MailboxItem item = requireOwnedItem(userId, itemId);
-        MailMessage mail = requireMail(item.getMailId());
-        List<String> recipients = recipientMapper.selectList(new QueryWrapper<MailRecipient>().eq("mail_id", mail.getId()))
-                .stream()
+        MailboxItem item = mailboxItemMapper.selectById(itemId);
+        if (item == null || !item.getUserId().equals(userId)) {
+            throw new BusinessException(404, "邮件不存在或无权访问");
+        }
+
+        MailMessage msg = mailMessageMapper.selectById(item.getMailId());
+        if (msg == null) {
+            throw new BusinessException(404, "邮件原文不存在");
+        }
+
+        // Recipients
+        List<MailRecipient> recipients = recipientMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<MailRecipient>()
+                        .eq("mail_id", item.getMailId())
+        );
+        List<String> recipientEmails = recipients.stream()
                 .map(MailRecipient::getRecipientEmail)
-                .toList();
-        return new WorkspaceMailDetailResponse(
+                .collect(Collectors.toList());
+
+        // AI results
+        List<MailAiResult> aiResults = aiResultMapper.listByMailAndUser(item.getMailId(), userId);
+        String analysisStatus = "PENDING";
+        List<String> summaryPoints = List.of();
+        MailItemBriefResponse.CategoryBrief catBrief = new MailItemBriefResponse.CategoryBrief(null, "Other", "#64748b");
+        boolean junk = false;
+        List<String> riskHints = List.of();
+
+        if (!aiResults.isEmpty()) {
+            analysisStatus = "SUCCEEDED";
+            for (MailAiResult r : aiResults) {
+                if ("SUMMARY".equals(r.getResultType())) {
+                    summaryPoints = extractSummaryPoints(r.getResultJson());
+                } else if ("ANALYZE".equals(r.getResultType())) {
+                    analysisStatus = "SUCCEEDED".equals(r.getStatus()) ? "SUCCEEDED" : "FAILED";
+                }
+            }
+        }
+
+        // Category
+        MailCategoryAssignment assignment = assignmentMapper.findByMailAndUser(item.getMailId(), userId);
+        if (assignment != null) {
+            MailCategory cat = categoryMapper.selectById(assignment.getCategoryId());
+            if (cat != null) {
+                catBrief = new MailItemBriefResponse.CategoryBrief(cat.getId(), cat.getName(), cat.getColor());
+                junk = "Junk Mail".equals(cat.getName());
+            }
+        }
+
+        // Attachments
+        List<MailAttachment> attachments = mailAttachmentMapper.listByMailId(item.getMailId());
+        List<AttachmentResponse> attachmentResponses = attachments.stream()
+                .map(a -> new AttachmentResponse(
+                        a.getId(), a.getOriginalName(), a.getMimeType(), a.getFileSize(),
+                        "/api/v1/attachments/" + a.getId() + "/download"))
+                .collect(Collectors.toList());
+
+        return new MailItemDetailResponse(
                 item.getId(),
-                mail.getId(),
+                item.getMailId(),
                 item.getFolder(),
-                mail.getSenderEmail(),
-                recipients,
-                mail.getSubject(),
-                mail.getContentText(),
-                mail.getContentHtml(),
+                msg.getSenderEmail(),
+                recipientEmails,
+                msg.getSubject(),
+                msg.getContentText(),
+                msg.getContentHtml(),
                 item.getReadFlag(),
                 item.getStarFlag(),
                 item.getPriority(),
-                analysis(userId, item),
-                List.of(),
-                new WorkspaceAgentResponse(true)
+                new MailItemDetailResponse.AnalysisSummary(analysisStatus, summaryPoints, catBrief, junk, riskHints),
+                attachmentResponses,
+                new MailItemDetailResponse.AgentAvailability(true),
+                msg.getSentAt()
         );
     }
 
-    private WorkspaceMailItemResponse toItemResponse(MailboxItem item) {
-        MailMessage mail = requireMail(item.getMailId());
-        WorkspaceAnalysisResponse analysis = analysis(item.getUserId(), item);
-        return new WorkspaceMailItemResponse(
-                item.getId(),
-                mail.getId(),
-                item.getFolder(),
-                mail.getSenderEmail(),
-                mail.getSubject(),
-                summaryPreview(mail, analysis),
-                analysis.category(),
-                analysis.status(),
-                item.getReadFlag(),
-                item.getStarFlag(),
-                item.getPriority(),
-                mail.getHasAttachment(),
-                item.getReceivedAt()
-        );
-    }
-
-    private WorkspaceAnalysisResponse analysis(Long userId, MailboxItem item) {
-        List<MailAiResult> results = aiResultMapper.listByMailAndUser(item.getMailId(), userId);
-        String status = results.stream().findFirst().map(MailAiResult::getStatus).orElse(null);
-        if (status == null) {
-            status = analysisTaskService.latestStatus(userId, item.getId());
-        }
-        List<String> summaries = results.stream()
-                .filter(result -> "SUMMARY".equalsIgnoreCase(result.getResultType()))
-                .map(MailAiResult::getResultJson)
-                .findFirst()
-                .map(this::summaryLines)
-                .orElse(List.of());
-        boolean junk = "JUNK".equalsIgnoreCase(item.getFolder()) || results.stream()
-                .anyMatch(result -> "JUNK".equalsIgnoreCase(result.getResultType()) && result.getResultJson().contains("true"));
-        return new WorkspaceAnalysisResponse(status == null ? "PENDING" : status, summaries, null, junk, List.of());
-    }
-
-    private List<String> summaryLines(String resultJson) {
-        String cleaned = resultJson == null ? "" : resultJson
-                .replace('[', ' ')
-                .replace(']', ' ')
-                .replace('{', ' ')
-                .replace('}', ' ')
-                .replace('"', ' ')
-                .trim();
-        if (cleaned.isBlank()) {
-            return List.of();
-        }
-        List<String> lines = new ArrayList<>();
-        for (String part : cleaned.split("\\\\n|;|,")) {
-            String value = part.trim();
-            if (!value.isBlank()) {
-                lines.add(value.length() > 160 ? value.substring(0, 160) : value);
-            }
-            if (lines.size() == 3) {
-                break;
-            }
-        }
-        return lines;
-    }
-
-    private String summaryPreview(MailMessage mail, WorkspaceAnalysisResponse analysis) {
-        String text = analysis.summary().isEmpty() ? mail.getContentText() : analysis.summary().get(0);
-        if (text == null) {
-            return "";
-        }
-        String oneLine = text.replaceAll("\\s+", " ").trim();
-        return oneLine.length() > 120 ? oneLine.substring(0, 120) : oneLine;
-    }
-
-    private boolean matchesView(MailboxItem item, String view) {
+    private String mapViewToFolder(String view) {
         return switch (view) {
-            case "sent" -> "SENT".equals(item.getFolder());
-            case "trash" -> "TRASH".equals(item.getFolder());
-            case "junk" -> "JUNK".equals(item.getFolder());
-            case "today" -> item.getReceivedAt() != null && item.getReceivedAt().toLocalDate().equals(LocalDate.now());
-            case "important" -> "HIGH".equalsIgnoreCase(item.getPriority()) || Boolean.TRUE.equals(item.getStarFlag());
-            case "unread" -> !Boolean.TRUE.equals(item.getReadFlag());
-            case "inbox" -> "INBOX".equals(item.getFolder());
-            case "drafts" -> false;
-            default -> "INBOX".equals(item.getFolder());
+            case "sent" -> "SENT";
+            case "drafts" -> "DRAFTS";
+            case "trash" -> "TRASH";
+            case "junk" -> "JUNK";
+            default -> "INBOX";
         };
     }
 
-    private boolean matchesKeyword(MailboxItem item, String keyword) {
-        if (keyword == null || keyword.isBlank()) {
-            return true;
+    private Map<Long, MailMessage> loadMessages(Set<Long> mailIds) {
+        if (mailIds.isEmpty()) return Map.of();
+        List<MailMessage> msgs = mailMessageMapper.selectBatchIds(mailIds);
+        Map<Long, MailMessage> map = new HashMap<>();
+        for (MailMessage m : msgs) {
+            map.put(m.getId(), m);
         }
-        MailMessage mail = requireMail(item.getMailId());
-        String needle = keyword.trim().toLowerCase(Locale.ROOT);
-        return contains(mail.getSenderEmail(), needle)
-                || contains(mail.getSubject(), needle)
-                || contains(mail.getContentText(), needle)
-                || contains(mail.getContentHtml(), needle);
+        return map;
     }
 
-    private boolean contains(String value, String needle) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
-    }
-
-    private String normalizeView(String view) {
-        return view == null || view.isBlank() ? "inbox" : view.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private MailboxItem requireOwnedItem(Long userId, Long itemId) {
-        MailboxItem item = mailboxMapper.selectById(itemId);
-        if (item == null || !userId.equals(item.getUserId()) || Boolean.TRUE.equals(item.getDeletedFlag())) {
-            throw new BusinessException(404, "Mailbox item not found");
+    private Map<Long, MailAiResult> loadLatestAiResults(Set<Long> mailIds, Long userId) {
+        Map<Long, MailAiResult> map = new HashMap<>();
+        for (Long mailId : mailIds) {
+            List<MailAiResult> results = aiResultMapper.listByMailAndUser(mailId, userId);
+            if (!results.isEmpty()) {
+                map.put(mailId, results.get(0)); // Already ordered by created_at DESC
+            }
         }
-        return item;
+        return map;
     }
 
-    private MailMessage requireMail(Long mailId) {
-        MailMessage mail = mailMapper.selectById(mailId);
-        if (mail == null) {
-            throw new BusinessException(404, "Mail not found");
+    private Map<Long, MailCategory> loadCategories(Set<Long> mailIds, Long userId) {
+        Map<Long, MailCategory> map = new HashMap<>();
+        for (Long mailId : mailIds) {
+            MailCategoryAssignment assignment = assignmentMapper.findByMailAndUser(mailId, userId);
+            if (assignment != null) {
+                MailCategory cat = categoryMapper.selectById(assignment.getCategoryId());
+                if (cat != null) {
+                    map.put(mailId, cat);
+                }
+            }
         }
-        return mail;
+        return map;
+    }
+
+    private String extractSummaryPreview(String json) {
+        if (json == null) return "";
+        try {
+            // Simple extraction: find "summary" array in JSON-like string
+            int idx = json.indexOf("\"summary\"");
+            if (idx >= 0) {
+                int start = json.indexOf("[", idx);
+                int end = json.indexOf("]", start);
+                if (start >= 0 && end >= 0) {
+                    String arr = json.substring(start + 1, end);
+                    // Extract first quoted string
+                    int q1 = arr.indexOf("\"");
+                    if (q1 >= 0) {
+                        int q2 = arr.indexOf("\"", q1 + 1);
+                        if (q2 >= 0) {
+                            String s = arr.substring(q1 + 1, q2);
+                            return s.length() > 80 ? s.substring(0, 80) + "..." : s;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    private List<String> extractSummaryPoints(String json) {
+        if (json == null) return List.of();
+        List<String> points = new ArrayList<>();
+        try {
+            int idx = json.indexOf("\"summary\"");
+            if (idx >= 0) {
+                int start = json.indexOf("[", idx);
+                int end = json.indexOf("]", start);
+                if (start >= 0 && end >= 0) {
+                    String arr = json.substring(start + 1, end);
+                    String[] parts = arr.split(",");
+                    for (String part : parts) {
+                        String trimmed = part.trim().replaceAll("^\"|\"$", "");
+                        if (!trimmed.isEmpty()) {
+                            points.add(trimmed);
+                            if (points.size() >= 3) break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return points;
     }
 }

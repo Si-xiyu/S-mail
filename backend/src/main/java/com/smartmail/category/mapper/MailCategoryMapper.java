@@ -9,18 +9,11 @@ import java.util.List;
 
 @Mapper
 public interface MailCategoryMapper extends BaseMapper<MailCategory> {
-    @Select("""
-            SELECT * FROM mail_category
-            WHERE user_id = #{userId}
-            ORDER BY system_flag DESC, id ASC
-            """)
-    List<MailCategory> listByUser(Long userId);
 
     @Select("""
             SELECT * FROM mail_category
             WHERE user_id = #{userId}
-              AND name = #{name}
-            LIMIT 1
+            ORDER BY sort_order, id
             """)
-    MailCategory findByUserAndName(Long userId, String name);
+    List<MailCategory> listByUser(Long userId);
 }

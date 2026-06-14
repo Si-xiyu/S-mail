@@ -26,7 +26,7 @@ public class UserService {
         if (user == null) {
             throw new BusinessException(404, "User not found");
         }
-        categoryService.ensureDefaults(userId);
+        categoryService.ensureDefaultCategories(userId);
         return new UserProfileResponse(
                 user.getId(),
                 user.getEmail(),

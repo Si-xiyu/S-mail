@@ -6,5 +6,4 @@ public record AttachmentResponse(
         String mimeType,
         Long fileSize,
         String downloadUrl
-) {
-}
+) {}
