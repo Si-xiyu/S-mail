@@ -3,28 +3,35 @@ import { ref } from 'vue'
 import TopBar from './components/TopBar.vue'
 import Sidebar from './components/Sidebar.vue'
 import MailList from './components/MailList.vue'
-import MailDetailDrawer from './components/MailDetailDrawer.vue'
+import MailDetailPage from './components/MailDetailPage.vue'
 import ComposeDialog from './components/ComposeDialog.vue'
 import { useMailStore } from './stores/mailStore'
 
+// 页面模式枚举
+enum PageMode {
+  LIST = 'list',
+  DETAIL = 'detail'
+}
+
 const mailStore = useMailStore()
+const pageMode = ref<PageMode>(PageMode.LIST)
 const selectedMailId = ref<string | null>(null)
-const showMailDetail = ref(false)
 const showCompose = ref(false)
 
 const handleSelectMail = (mailId: string) => {
   selectedMailId.value = mailId
-  showMailDetail.value = true
+  pageMode.value = PageMode.DETAIL
 }
 
-const handleCloseMailDetail = () => {
-  showMailDetail.value = false
+const handleBackFromDetail = () => {
+  pageMode.value = PageMode.LIST
   selectedMailId.value = null
 }
 
 const handleComposeBtnClick = () => {
   showCompose.value = true
 }
+
 </script>
 
 <template>
@@ -33,14 +40,13 @@ const handleComposeBtnClick = () => {
 
     <div class="main-container">
       <Sidebar @compose-click="handleComposeBtnClick" />
-      <MailList @select-mail="handleSelectMail" />
-    </div>
 
-    <MailDetailDrawer
-      v-if="showMailDetail"
-      :mail-id="selectedMailId"
-      @close="handleCloseMailDetail"
-    />
+      <!-- 邮件列表视图 -->
+      <MailList v-if="pageMode === 'list'" @select-mail="handleSelectMail" />
+
+      <!-- 邮件详情视图 -->
+      <MailDetailPage v-if="pageMode === 'detail'" :mail-id="selectedMailId" @back="handleBackFromDetail" />
+    </div>
 
     <ComposeDialog v-model="showCompose" />
   </div>

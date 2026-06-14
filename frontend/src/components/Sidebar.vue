@@ -1,23 +1,11 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref } from 'vue'
 
 const mailStore = useMailStore()
 
-const isCollapsed = ref(false)
-
-const handleResize = () => {
-  isCollapsed.value = window.innerWidth < 1200
-}
-
-onMounted(() => {
-  handleResize()
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
+// 始终保持收起状态（80px）
+const isCollapsed = ref(true)
 
 const mainLabels = computed(() => {
   return mailStore.labels.filter(l => ['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
