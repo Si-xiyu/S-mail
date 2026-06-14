@@ -2,6 +2,7 @@ package com.smartmail.mail.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.smartmail.ai.mapper.MailAiResultMapper;
+import com.smartmail.attachment.service.AttachmentService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.CurrentUser;
 import com.smartmail.common.security.UserContext;
@@ -33,19 +34,22 @@ public class MailService {
     private final MailboxItemMapper mailboxMapper;
     private final SysUserMapper userMapper;
     private final MailAiResultMapper aiResultMapper;
+    private final AttachmentService attachmentService;
 
     public MailService(
             MailMessageMapper mailMapper,
             MailRecipientMapper recipientMapper,
             MailboxItemMapper mailboxMapper,
             SysUserMapper userMapper,
-            MailAiResultMapper aiResultMapper
+            MailAiResultMapper aiResultMapper,
+            AttachmentService attachmentService
     ) {
         this.mailMapper = mailMapper;
         this.recipientMapper = recipientMapper;
         this.mailboxMapper = mailboxMapper;
         this.userMapper = userMapper;
         this.aiResultMapper = aiResultMapper;
+        this.attachmentService = attachmentService;
     }
 
     @Transactional
@@ -66,6 +70,12 @@ public class MailService {
         message.setSentAt(now);
         message.setCreatedAt(now);
         mailMapper.insert(message);
+
+        int attachmentCount = attachmentService.bindPendingAttachments(sender.id(), message.getId(), request.pendingAttachmentIds());
+        if (attachmentCount > 0) {
+            message.setHasAttachment(true);
+            mailMapper.updateById(message);
+        }
 
         createMailboxItem(sender.id(), message.getId(), "SENT", true, now);
         List<String> allRecipients = new ArrayList<>();
@@ -126,7 +136,8 @@ public class MailService {
                 item.getPriority(),
                 message.getSentAt(),
                 recipients,
-                aiResults
+                aiResults,
+                attachmentService.listMailAttachments(mailId)
         );
     }
 

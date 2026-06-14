@@ -182,7 +182,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "pendingAttachmentId": "pa_123",
+  "pendingAttachmentId": 123,
   "fileName": "report.docx",
   "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "fileSize": 102400,
@@ -206,7 +206,7 @@ Authorization: Bearer <token>
   "subject": "SmartMail MVP 联调",
   "contentText": "这是一封测试邮件。",
   "contentHtml": null,
-  "pendingAttachmentIds": ["pa_123"]
+  "pendingAttachmentIds": [123]
 }
 ```
 
