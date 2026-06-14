@@ -39,17 +39,16 @@
 mvn clean test
 ```
 
-最新结果：新增搜索边界测试后失败。
+最新结果：通过。
 
 通过：
 
 - `AttachmentServiceTest`: 4/4 passed
 - `InternalToolServiceSecurityTest`: 2/2 passed
+- `SearchServiceBehaviorTest`: 1/1 passed
 - `WorkspaceServiceBehaviorTest`: 2/2 passed
 
-失败：
-
-- `SearchServiceBehaviorTest.searchNormalizesFolderAndPaginationLikeMailboxList`
+失败：无
 
 ### Agent
 
@@ -69,7 +68,7 @@ E:\software\Miniconda\python.exe -m pytest
 
 ## 发现的问题
 
-说明：问题 1-5 已由 `aebec8d 修复 main-test 契约测试发现` 修复，并在本轮回归中通过。问题 6 是本轮继续审查新增发现，当前仍有失败测试覆盖。
+说明：问题 1-5 已由 `aebec8d 修复 main-test 契约测试发现` 修复，并在本轮回归中通过。问题 6 已由 `0f71f97 修复搜索参数边界` 修复，并在本轮回归中通过。
 
 ### 1. Workspace 普通文件夹列表存在二次分页
 
@@ -171,6 +170,8 @@ E:\software\Miniconda\python.exe -m pytest
 
 风险等级：中
 
+状态：已由 `0f71f97` 修复。
+
 现象：
 
 - `SearchService.search("project", "inbox", 0, 500)` 会把 `folder="inbox"` 原样传给 Mapper。
@@ -202,6 +203,6 @@ E:\software\Miniconda\python.exe -m pytest
 
 ## 建议优先级
 
-1. 修复 SearchService 的 folder 规范化和分页参数防御。
-2. 后续补充 Controller 层集成测试，覆盖 token 鉴权、跨用户访问、附件下载权限、Workspace API 全链路。
-3. 补充搜索接口集成测试，验证 `folder=inbox`、空 keyword、page/pageSize 边界和搜索结果分页。
+1. 后续补充 Controller 层集成测试，覆盖 token 鉴权、跨用户访问、附件下载权限、Workspace API 全链路。
+2. 补充搜索接口集成测试，验证 `folder=inbox`、空 keyword、page/pageSize 边界和搜索结果分页。
+3. 补充邮件发送集成测试，覆盖无效收件人、抄送、附件绑定、投递后分析任务创建。
