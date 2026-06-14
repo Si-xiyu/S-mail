@@ -12,9 +12,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class MailboxService {
+    private static final Set<String> MOVABLE_FOLDERS = Set.of("INBOX", "JUNK", "TRASH", "SENT");
+
     private final MailboxItemMapper mailboxMapper;
     private final MailMessageMapper mailMapper;
 
@@ -46,6 +49,20 @@ public class MailboxService {
     public void star(Long itemId, boolean starred) {
         MailboxItem item = requireOwnedItem(itemId);
         item.setStarFlag(starred);
+        item.setUpdatedAt(LocalDateTime.now());
+        mailboxMapper.updateById(item);
+    }
+
+    public void move(Long itemId, String folder) {
+        MailboxItem item = requireOwnedItem(itemId);
+        String targetFolder = normalizeFolder(folder);
+        if (!MOVABLE_FOLDERS.contains(targetFolder)) {
+            throw new BusinessException(400, "Unsupported mailbox folder");
+        }
+        if ("SENT".equals(targetFolder) && !"SENT".equals(item.getFolder())) {
+            throw new BusinessException(400, "Only sent items can be restored to Sent");
+        }
+        item.setFolder(targetFolder);
         item.setUpdatedAt(LocalDateTime.now());
         mailboxMapper.updateById(item);
     }
