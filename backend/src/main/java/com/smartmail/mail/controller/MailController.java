@@ -27,6 +27,11 @@ public class MailController {
         return ApiResponse.ok(mailService.send(request));
     }
 
+    @PostMapping("/send")
+    public ApiResponse<MailSendResponse> sendAlias(@Valid @RequestBody SendMailRequest request) {
+        return ApiResponse.ok(mailService.send(request));
+    }
+
     @GetMapping("/{mailId}")
     public ApiResponse<MailDetailResponse> detail(@PathVariable Long mailId) {
         return ApiResponse.ok(mailService.detail(mailId));

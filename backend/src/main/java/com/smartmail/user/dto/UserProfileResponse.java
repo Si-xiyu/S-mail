@@ -1,4 +1,10 @@
 package com.smartmail.user.dto;
 
-public record UserProfileResponse(Long id, String email, String username, String status) {
+public record UserProfileResponse(
+        Long id,
+        String email,
+        String username,
+        String status,
+        UserSettingResponse settings
+) {
 }

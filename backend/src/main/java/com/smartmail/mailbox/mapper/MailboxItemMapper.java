@@ -3,9 +3,12 @@ package com.smartmail.mailbox.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.smartmail.mailbox.entity.MailboxItem;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
@@ -36,4 +39,126 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
               AND deleted_flag = FALSE
             """)
     long countByFolder(Long userId, String folder);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND read_flag = FALSE
+            """)
+    long countUnread(Long userId);
+
+    @Select("""
+            SELECT * FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+            ORDER BY received_at DESC
+            """)
+    List<MailboxItem> listVisibleByUser(Long userId);
+
+    @Select("""
+            <script>
+            SELECT mi.*, mm.sender_email, mm.subject, mm.content_text, mm.has_attachment
+            FROM mailbox_item mi
+            JOIN mail_message mm ON mi.mail_id = mm.id
+            WHERE mi.user_id = #{userId}
+              AND mi.deleted_flag = FALSE
+              AND (mm.subject LIKE #{keyword}
+                   OR mm.sender_email LIKE #{keyword}
+                   OR mm.content_text LIKE #{keyword})
+              <if test="folder != null">
+              AND mi.folder = #{folder}
+              </if>
+            ORDER BY mi.received_at DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<Map<String, Object>> searchByKeyword(@Param("userId") Long userId,
+                                              @Param("keyword") String keyword,
+                                              @Param("folder") String folder,
+                                              @Param("limit") long limit,
+                                              @Param("offset") long offset);
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM mailbox_item mi
+            JOIN mail_message mm ON mi.mail_id = mm.id
+            WHERE mi.user_id = #{userId}
+              AND mi.deleted_flag = FALSE
+              AND (mm.subject LIKE #{keyword}
+                   OR mm.sender_email LIKE #{keyword}
+                   OR mm.content_text LIKE #{keyword})
+              <if test="folder != null">
+              AND mi.folder = #{folder}
+              </if>
+            </script>
+            """)
+    long countByKeyword(@Param("userId") Long userId,
+                        @Param("keyword") String keyword,
+                        @Param("folder") String folder);
+
+    @Select("""
+            SELECT * FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND folder = 'INBOX'
+              AND deleted_flag = FALSE
+              AND read_flag = FALSE
+            ORDER BY received_at DESC
+            """)
+    List<MailboxItem> listUnread(Long userId);
+
+    @Select("""
+            SELECT * FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND folder = 'INBOX'
+              AND deleted_flag = FALSE
+              AND priority IN ('HIGH', 'URGENT')
+            ORDER BY received_at DESC
+            """)
+    List<MailboxItem> listImportant(Long userId);
+
+    @Select("""
+            SELECT * FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND received_at >= #{startOfDay}
+            ORDER BY received_at DESC
+            """)
+    List<MailboxItem> listToday(Long userId, LocalDateTime startOfDay);
+
+    @Select("""
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND folder = #{folder}
+              AND deleted_flag = FALSE
+              AND read_flag = FALSE
+            """)
+    long countUnreadByFolder(Long userId, String folder);
+
+    @Select("""
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND folder = 'INBOX'
+              AND deleted_flag = FALSE
+              AND priority IN ('HIGH', 'URGENT')
+            """)
+    long countImportant(Long userId);
+
+    @Select("""
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND received_at >= #{startOfDay}
+            """)
+    long countToday(Long userId, LocalDateTime startOfDay);
+
+    @Select("""
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND received_at > #{since}
+            """)
+    long countSince(Long userId, LocalDateTime since);
 }

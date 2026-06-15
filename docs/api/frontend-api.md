@@ -1,6 +1,10 @@
 # SmartMail 前端 API 文档
 
-> 本文档记录前端（Vue 3）所需的后端接口规范
+> 本文档记录前端（Vue 3）所需的后端接口规范。
+> 
+> 参考资料：
+> - [MVP API 草案](mvp-api.md) - 完整的后端接口设计
+> - [Agent Plugin API](agent-plugin-api.md) - AI Agent 接口
 
 ## 基础配置
 
@@ -8,6 +12,26 @@
 - **认证方式**: JWT Bearer Token
 - **超时时间**: 5000ms
 - **Token 存储**: localStorage 中的 `smartmail_token`
+
+## 响应格式规范
+
+所有 API 响应遵循统一格式：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {}
+}
+```
+
+**错误码规约**:
+- `0` - 成功
+- `400` - 请求参数错误
+- `401` - 未授权（无效或过期的 Token）
+- `403` - 禁止访问
+- `404` - 资源不存在
+- `500` - 服务器内部错误
 
 ## 认证模块 (`/auth`)
 
@@ -269,23 +293,23 @@ interface AgentTaskResponse {
 
 ## 错误处理
 
-所有 API 响应遵循统一格式：
+所有 API 响应遵循统一格式（见"响应格式规范"）。
 
-```json
-{
-  "code": 0,
-  "message": "Success 或 Error Message",
-  "data": {}
-}
-```
+## Workspace API（推荐前端使用）
 
-**错误码规约**:
-- `0` - 成功
-- `400` - 请求参数错误
-- `401` - 未授权（无效或过期的 Token）
-- `403` - 禁止访问
-- `404` - 资源不存在
-- `500` - 服务器内部错误
+参考 [MVP API 草案](mvp-api.md) 的 **Section 3: Workspace API**
+
+### GET `/api/v1/workspace/views`
+
+返回左侧工作区导航需要的所有数据（views、folders、categories）。
+
+### GET `/api/v1/workspace/mail-items`
+
+获取邮件列表（支持分页、排序、过滤）。
+
+### GET `/api/v1/workspace/mail-detail/{mailId}`
+
+获取单个邮件的详细信息。
 
 ## 前端 Mock 策略
 
@@ -300,3 +324,5 @@ interface AgentTaskResponse {
 - 前端 API 客户端: `frontend/src/api/client.ts`
 - 前端类型定义: `frontend/src/types/mail.ts`
 - 前端存储: `frontend/src/stores/mailStore.ts`
+- 后端完整 API: [MVP API 草案](mvp-api.md)
+- AI 接口: [Agent Plugin API](agent-plugin-api.md)

@@ -1,5 +1,7 @@
 package com.smartmail.mail.dto;
 
+import com.smartmail.attachment.dto.AttachmentResponse;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,7 @@ public record MailDetailResponse(
         String priority,
         LocalDateTime sentAt,
         List<String> recipients,
-        List<Map<String, Object>> aiResults
+        List<Map<String, Object>> aiResults,
+        List<AttachmentResponse> attachments
 ) {
 }

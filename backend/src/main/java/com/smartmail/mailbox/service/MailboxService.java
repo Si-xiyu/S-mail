@@ -1,5 +1,6 @@
 package com.smartmail.mailbox.service;
 
+import com.smartmail.category.service.CategoryService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.response.PageResponse;
 import com.smartmail.common.security.UserContext;
@@ -12,15 +13,21 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class MailboxService {
+    private static final Set<String> MOVABLE_FOLDERS = Set.of("INBOX", "JUNK", "TRASH", "SENT");
+
     private final MailboxItemMapper mailboxMapper;
     private final MailMessageMapper mailMapper;
+    private final CategoryService categoryService;
 
-    public MailboxService(MailboxItemMapper mailboxMapper, MailMessageMapper mailMapper) {
+    public MailboxService(MailboxItemMapper mailboxMapper, MailMessageMapper mailMapper,
+                          CategoryService categoryService) {
         this.mailboxMapper = mailboxMapper;
         this.mailMapper = mailMapper;
+        this.categoryService = categoryService;
     }
 
     public PageResponse<MailboxItemResponse> list(String folder, long page, long pageSize) {
@@ -50,6 +57,34 @@ public class MailboxService {
         mailboxMapper.updateById(item);
     }
 
+    public void move(Long itemId, String folder) {
+        MailboxItem item = requireOwnedItem(itemId);
+        String targetFolder = normalizeFolder(folder);
+        if (!MOVABLE_FOLDERS.contains(targetFolder)) {
+            throw new BusinessException(400, "Unsupported mailbox folder");
+        }
+        if ("SENT".equals(targetFolder) && !"SENT".equals(item.getFolder())) {
+            throw new BusinessException(400, "Only sent items can be restored to Sent");
+        }
+        item.setFolder(targetFolder);
+        item.setUpdatedAt(LocalDateTime.now());
+        mailboxMapper.updateById(item);
+
+        com.smartmail.category.entity.MailCategory junkCat =
+                categoryService.findDefaultCategory(UserContext.requireUserId(), CategoryService.DEFAULT_JUNK);
+        com.smartmail.category.entity.MailCategory otherCat =
+                categoryService.findDefaultCategory(UserContext.requireUserId(), CategoryService.DEFAULT_OTHER);
+        if ("JUNK".equals(targetFolder) && junkCat != null) {
+            categoryService.assignCategory(item.getMailId(), junkCat.getId(), "MANUAL");
+        } else if ("INBOX".equals(targetFolder) && junkCat != null) {
+            com.smartmail.category.entity.MailCategory currentCat =
+                    categoryService.getCategoryForMail(item.getMailId(), UserContext.requireUserId());
+            if (currentCat != null && CategoryService.DEFAULT_JUNK.equals(currentCat.getName()) && otherCat != null) {
+                categoryService.assignCategory(item.getMailId(), otherCat.getId(), "MANUAL");
+            }
+        }
+    }
+
     public void delete(Long itemId) {
         MailboxItem item = requireOwnedItem(itemId);
         if ("TRASH".equals(item.getFolder())) {
@@ -59,6 +94,11 @@ public class MailboxService {
         }
         item.setUpdatedAt(LocalDateTime.now());
         mailboxMapper.updateById(item);
+    }
+
+    public void changeCategory(Long itemId, Long categoryId) {
+        MailboxItem item = requireOwnedItem(itemId);
+        categoryService.assignCategory(item.getMailId(), categoryId, "MANUAL");
     }
 
     private MailboxItemResponse toResponse(MailboxItem item) {

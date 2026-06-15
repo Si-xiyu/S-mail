@@ -10,6 +10,7 @@ public record SendMailRequest(
         List<String> cc,
         @NotBlank String subject,
         @NotBlank String contentText,
-        String contentHtml
+        String contentHtml,
+        List<Long> pendingAttachmentIds
 ) {
 }

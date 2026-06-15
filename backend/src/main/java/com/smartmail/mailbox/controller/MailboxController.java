@@ -2,14 +2,20 @@ package com.smartmail.mailbox.controller;
 
 import com.smartmail.common.response.ApiResponse;
 import com.smartmail.common.response.PageResponse;
+import com.smartmail.mailbox.dto.CategoryChangeRequest;
 import com.smartmail.mailbox.dto.MailboxItemResponse;
+import com.smartmail.mailbox.dto.MoveRequest;
 import com.smartmail.mailbox.dto.ReadRequest;
 import com.smartmail.mailbox.dto.StarRequest;
 import com.smartmail.mailbox.service.MailboxService;
+import com.smartmail.search.dto.SearchResultResponse;
+import com.smartmail.search.service.SearchService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/mailbox")
 public class MailboxController {
     private final MailboxService mailboxService;
+    private final SearchService searchService;
 
-    public MailboxController(MailboxService mailboxService) {
+    public MailboxController(MailboxService mailboxService, SearchService searchService) {
         this.mailboxService = mailboxService;
+        this.searchService = searchService;
     }
 
     @GetMapping
@@ -48,6 +56,30 @@ public class MailboxController {
     @DeleteMapping("/items/{itemId}")
     public ApiResponse<Void> delete(@PathVariable Long itemId) {
         mailboxService.delete(itemId);
+        return ApiResponse.ok();
+    }
+
+    @GetMapping("/search")
+    public ApiResponse<PageResponse<SearchResultResponse>> search(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "INBOX") String folder,
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "20") long pageSize
+    ) {
+        return ApiResponse.ok(searchService.search(keyword, folder, page, pageSize));
+    }
+
+    @PatchMapping("/items/{itemId}/category")
+    public ApiResponse<Void> changeCategory(@PathVariable Long itemId,
+                                             @Valid @RequestBody CategoryChangeRequest request) {
+        mailboxService.changeCategory(itemId, request.categoryId());
+        return ApiResponse.ok();
+    }
+
+    @PostMapping("/items/{itemId}/move")
+    public ApiResponse<Void> move(@PathVariable Long itemId,
+                                   @Valid @RequestBody MoveRequest request) {
+        mailboxService.move(itemId, request.folder());
         return ApiResponse.ok();
     }
 }
