@@ -1,4 +1,7 @@
-// 邮件主数据
+// ============ Legacy Types (for Pinia Store compatibility) ============
+// 这些类型用于维持现有 mailStore 的兼容性
+// 新代码应该优先使用 mail.ts 中的类型
+
 export interface Mail {
   id: string
   subject: string
@@ -15,7 +18,6 @@ export interface Mail {
   attachments?: Attachment[]
 }
 
-// 用户视图中的邮件项
 export interface MailItem {
   id: string
   subject: string
@@ -29,7 +31,6 @@ export interface MailItem {
   hasAttachment: boolean
 }
 
-// 附件
 export interface Attachment {
   id: string
   filename: string
@@ -37,7 +38,6 @@ export interface Attachment {
   mimeType: string
 }
 
-// 用户
 export interface User {
   id: string
   email: string
@@ -45,7 +45,6 @@ export interface User {
   avatar?: string
 }
 
-// 标签
 export interface Label {
   id: string
   name: string

@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { useMailStore } from '../stores/mailStore'
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
+const router = useRouter()
 const mailStore = useMailStore()
 const searchQuery = ref('')
 const userMenuOpen = ref(false)
+const userMenuRef = ref<HTMLDivElement | null>(null)
 
 const handleSearch = () => {
   console.log('Search for:', searchQuery.value)
@@ -12,8 +15,29 @@ const handleSearch = () => {
 
 const handleLogout = () => {
   userMenuOpen.value = false
-  console.log('Logout')
+  mailStore.logout()
+  router.push('/auth/login')
 }
+
+// 点击菜单按钮
+const toggleUserMenu = () => {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+// 点击外部关闭菜单
+const handleClickOutside = (e: MouseEvent) => {
+  if (userMenuRef.value && !userMenuRef.value.contains(e.target as Node)) {
+    userMenuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -56,17 +80,20 @@ const handleLogout = () => {
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3m0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22" />
         </svg>
       </button>
-      <div class="user-menu">
-        <button class="avatar-button" @click="userMenuOpen = !userMenuOpen">
-          <img :src="mailStore.user.avatar" :alt="mailStore.user.name" />
+      <div class="user-menu" ref="userMenuRef">
+        <button class="avatar-button" @click="toggleUserMenu" :class="{ active: userMenuOpen }" type="button">
+          <img v-if="mailStore.user?.avatar" :src="mailStore.user.avatar" :alt="mailStore.user?.name" />
+          <span v-else class="avatar-placeholder">{{ mailStore.user?.name?.charAt(0).toUpperCase() || 'U' }}</span>
         </button>
-        <div v-if="userMenuOpen" class="user-dropdown">
-          <div class="user-info">
-            <strong>{{ mailStore.user.name }}</strong>
-            <span>{{ mailStore.user.email }}</span>
+        <transition name="dropdown">
+          <div v-if="userMenuOpen" class="user-dropdown">
+            <div class="user-info">
+              <strong>{{ mailStore.user?.name || 'User' }}</strong>
+              <span>{{ mailStore.user?.email || 'No email' }}</span>
+            </div>
+            <button @click="handleLogout" class="logout-button" type="button">Sign out</button>
           </div>
-          <button @click="handleLogout">Sign out</button>
-        </div>
+        </transition>
       </div>
     </div>
   </header>
@@ -157,19 +184,43 @@ const handleLogout = () => {
 }
 
 .avatar-button {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid transparent;
   cursor: pointer;
   overflow: hidden;
   padding: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.avatar-button:hover {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.avatar-button.active {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 .avatar-button img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .user-dropdown {
@@ -206,7 +257,7 @@ const handleLogout = () => {
 .user-dropdown button {
   display: block;
   width: 100%;
-  padding: 10px 16px;
+  padding: 12px 16px;
   border: none;
   background: transparent;
   text-align: left;
@@ -218,5 +269,28 @@ const handleLogout = () => {
 
 .user-dropdown button:hover {
   background: #f3f4f6;
+}
+
+.logout-button {
+  color: #ef4444 !important;
+}
+
+.logout-button:hover {
+  background: #fee2e2 !important;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>
