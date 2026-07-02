@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS sys_user (
+CREATE TABLE sys_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(128) NOT NULL UNIQUE,
     username VARCHAR(64) NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS user_setting (
+CREATE TABLE user_setting (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL UNIQUE,
     ai_enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS user_setting (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mail_message (
+CREATE TABLE mail_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     message_no VARCHAR(64) NOT NULL UNIQUE,
     sender_id BIGINT NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS mail_message (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mail_recipient (
+CREATE TABLE mail_recipient (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     mail_id BIGINT NOT NULL,
     recipient_id BIGINT,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS mail_recipient (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mailbox_item (
+CREATE TABLE mailbox_item (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     mail_id BIGINT NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS mailbox_item (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS pending_attachment (
+CREATE TABLE pending_attachment (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     uploader_id BIGINT NOT NULL,
     original_name VARCHAR(255) NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS pending_attachment (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mail_attachment (
+CREATE TABLE mail_attachment (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     mail_id BIGINT,
     uploader_id BIGINT NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS mail_attachment (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mail_category (
+CREATE TABLE mail_category (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     name VARCHAR(64) NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS mail_category (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mail_category_assignment (
+CREATE TABLE mail_category_assignment (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     category_id BIGINT NOT NULL,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS mail_category_assignment (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mail_ai_result (
+CREATE TABLE mail_ai_result (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     mail_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS mail_ai_result (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS ai_analysis_task (
+CREATE TABLE ai_analysis_task (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     item_id BIGINT NOT NULL,
     mail_id BIGINT NOT NULL,
@@ -122,17 +122,17 @@ CREATE TABLE IF NOT EXISTS ai_analysis_task (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_mailbox_user_folder ON mailbox_item(user_id, folder, deleted_flag);
-CREATE INDEX IF NOT EXISTS idx_mailbox_user_received ON mailbox_item(user_id, received_at, deleted_flag);
-CREATE INDEX IF NOT EXISTS idx_recipient_mail ON mail_recipient(mail_id);
-CREATE INDEX IF NOT EXISTS idx_ai_mail_user_type ON mail_ai_result(mail_id, user_id, result_type);
-CREATE INDEX IF NOT EXISTS idx_pending_uploader ON pending_attachment(uploader_id, status);
-CREATE INDEX IF NOT EXISTS idx_attachment_mail ON mail_attachment(mail_id);
-CREATE INDEX IF NOT EXISTS idx_category_user ON mail_category(user_id);
-CREATE INDEX IF NOT EXISTS idx_category_user_name ON mail_category(user_id, name);
-CREATE INDEX IF NOT EXISTS idx_assignment_user_mail ON mail_category_assignment(user_id, mail_id);
-CREATE INDEX IF NOT EXISTS idx_assignment_category ON mail_category_assignment(category_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_unique ON mail_category_assignment(user_id, mail_id);
-CREATE INDEX IF NOT EXISTS idx_analysis_task_pending ON ai_analysis_task(status, created_at);
-CREATE INDEX IF NOT EXISTS idx_analysis_task_item ON ai_analysis_task(item_id, user_id, status);
-CREATE INDEX IF NOT EXISTS idx_analysis_task_mail_user ON ai_analysis_task(mail_id, user_id);
+CREATE INDEX idx_mailbox_user_folder ON mailbox_item(user_id, folder, deleted_flag);
+CREATE INDEX idx_mailbox_user_received ON mailbox_item(user_id, received_at, deleted_flag);
+CREATE INDEX idx_recipient_mail ON mail_recipient(mail_id);
+CREATE INDEX idx_ai_mail_user_type ON mail_ai_result(mail_id, user_id, result_type);
+CREATE INDEX idx_pending_uploader ON pending_attachment(uploader_id, status);
+CREATE INDEX idx_attachment_mail ON mail_attachment(mail_id);
+CREATE INDEX idx_category_user ON mail_category(user_id);
+CREATE INDEX idx_category_user_name ON mail_category(user_id, name);
+CREATE INDEX idx_assignment_user_mail ON mail_category_assignment(user_id, mail_id);
+CREATE INDEX idx_assignment_category ON mail_category_assignment(category_id);
+CREATE UNIQUE INDEX idx_assignment_unique ON mail_category_assignment(user_id, mail_id);
+CREATE INDEX idx_analysis_task_pending ON ai_analysis_task(status, created_at);
+CREATE INDEX idx_analysis_task_item ON ai_analysis_task(item_id, user_id, status);
+CREATE INDEX idx_analysis_task_mail_user ON ai_analysis_task(mail_id, user_id);

@@ -7,7 +7,7 @@ spring:
   datasource:
     url: ${SMARTMAIL_DB_URL:jdbc:mysql://localhost:3306/smartmail?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${SMARTMAIL_DB_USERNAME:root}
-    password: ${SMARTMAIL_DB_PASSWORD:root}
+    password: ${SMARTMAIL_DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
   sql:
     init:
