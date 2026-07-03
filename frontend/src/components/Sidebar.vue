@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 const mailStore = useMailStore()
-
-// 始终保持收起状态（80px）
-const isCollapsed = ref(true)
 
 const mainLabels = computed(() => {
   return mailStore.labels.filter(l => ['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
@@ -45,14 +42,14 @@ const getLabelIcon = (labelId: string) => {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed: isCollapsed }">
+  <aside class="sidebar">
     <div class="compose-btn-container">
-      <button class="compose-btn" @click="handleComposeClick" :title="isCollapsed ? 'Compose' : ''">
+      <button class="compose-btn" @click="handleComposeClick">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-        <span v-if="!isCollapsed">Compose</span>
+        <span>Compose</span>
       </button>
     </div>
 
@@ -63,100 +60,85 @@ const getLabelIcon = (labelId: string) => {
           :key="label.id"
           class="label-item"
           :class="{ active: isActive(label.id) }"
-          :title="isCollapsed ? label.name : ''"
           @click="selectLabel(label.id)"
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
-          <span v-if="!isCollapsed" class="label-name">{{ label.name }}</span>
-          <span v-if="!isCollapsed && label.count > 0" class="label-count">{{ label.count }}</span>
+          <span class="label-name">{{ label.name }}</span>
+          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
         </button>
       </div>
 
-      <div class="labels-divider"></div>
-
       <div class="labels-group">
-        <div v-if="!isCollapsed" class="section-title">More</div>
         <button
           v-for="label in otherLabels"
           :key="label.id"
           class="label-item"
           :class="{ active: isActive(label.id) }"
-          :title="isCollapsed ? label.name : ''"
           @click="selectLabel(label.id)"
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
-          <span v-if="!isCollapsed" class="label-name">{{ label.name }}</span>
-          <span v-if="!isCollapsed && label.count > 0" class="label-count">{{ label.count }}</span>
+          <span class="label-name">{{ label.name }}</span>
+          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
         </button>
       </div>
     </nav>
 
     <div class="sidebar-footer">
-      <button class="settings-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" />
+      <button class="add-tag-btn" title="Add Tag">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14" />
         </svg>
+        <span>Add Tag</span>
       </button>
-      <button class="help-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4M12 8h.01" />
-        </svg>
-      </button>
+      <div class="footer-buttons">
+        <button class="settings-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" />
+          </svg>
+        </button>
+        <button class="help-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+        </button>
+      </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
 .sidebar {
-  width: 256px;
+  width: 240px;
   background: #fff;
   border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   padding: 16px 0;
   overflow-y: auto;
-  transition: width 0.3s ease;
-}
-
-.sidebar.collapsed {
-  width: 80px;
-  padding: 12px 0;
 }
 
 .compose-btn-container {
-  padding: 0 16px 16px;
-  transition: padding 0.3s ease;
-}
-
-.sidebar.collapsed .compose-btn-container {
-  padding: 0 8px 12px;
+  padding: 0 12px 16px;
 }
 
 .compose-btn {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 24px;
-  font-size: 15px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s;
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
-}
-
-.sidebar.collapsed .compose-btn {
-  padding: 10px;
-  border-radius: 50%;
-  width: 44px;
-  height: 44px;
 }
 
 .compose-btn:hover {
@@ -179,34 +161,27 @@ const getLabelIcon = (labelId: string) => {
 }
 
 .section-title {
-  padding: 12px 12px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: #6b7280;
-  letter-spacing: 0.5px;
+  display: none;
+}
+
+.labels-divider {
+  display: none;
 }
 
 .label-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 8px 10px;
   background: transparent;
   border: none;
-  border-radius: 0 24px 24px 0;
+  border-radius: 0 20px 20px 0;
   cursor: pointer;
   color: #374151;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s;
   width: 100%;
-}
-
-.sidebar.collapsed .label-item {
-  justify-content: center;
-  padding: 8px;
-  gap: 0;
-  border-radius: 8px;
+  justify-content: flex-start;
 }
 
 .label-item:hover {
@@ -220,22 +195,25 @@ const getLabelIcon = (labelId: string) => {
 }
 
 .label-icon {
-  flex: 0 0 24px;
+  flex: 0 0 20px;
   text-align: center;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .label-name {
   flex: 1;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .label-count {
   flex: 0 0 auto;
   padding: 2px 6px;
   background: #f3f4f6;
-  border-radius: 12px;
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 11px;
   color: #6b7280;
   font-weight: 500;
 }
@@ -245,24 +223,44 @@ const getLabelIcon = (labelId: string) => {
   color: #667eea;
 }
 
-.labels-divider {
-  height: 1px;
-  background: #e5e7eb;
-  margin: 8px 12px;
-}
-
 .sidebar-footer {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 16px;
+  padding: 12px;
   border-top: 1px solid #e5e7eb;
-  transition: padding 0.3s ease;
+  margin-top: auto;
 }
 
-.sidebar.collapsed .sidebar-footer {
-  flex-direction: column;
-  padding: 8px;
-  gap: 4px;
+.add-tag-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #667eea;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  width: 100%;
+  justify-content: center;
+}
+
+.add-tag-btn:hover {
+  background: #f0f4ff;
+  border-color: #667eea;
+}
+
+.add-tag-btn svg {
+  flex: 0 0 20px;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .settings-btn,
@@ -278,11 +276,6 @@ const getLabelIcon = (labelId: string) => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-}
-
-.sidebar.collapsed .settings-btn,
-.sidebar.collapsed .help-btn {
-  padding: 6px;
 }
 
 .settings-btn:hover,
