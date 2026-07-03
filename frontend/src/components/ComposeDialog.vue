@@ -24,7 +24,7 @@ const form = reactive({
 
 const isMinimized = ref(false)
 
-const handleSend = () => {
+const handleSend = async () => {
   if (!form.to || !form.subject) {
     alert('Please fill in recipient and subject')
     return
@@ -33,16 +33,20 @@ const handleSend = () => {
   const toList = form.to.split(',').map(e => e.trim()).filter(Boolean)
   const ccList = form.cc.split(',').map(e => e.trim()).filter(Boolean)
 
-  mailStore.sendMail(toList, form.subject, form.content, ccList.length > 0 ? ccList : undefined)
+  try {
+    await mailStore.sendMail(toList, form.subject, form.content, ccList.length > 0 ? ccList : undefined)
 
-  // Reset form
-  form.to = ''
-  form.cc = ''
-  form.bcc = ''
-  form.subject = ''
-  form.content = ''
+    // Reset form
+    form.to = ''
+    form.cc = ''
+    form.bcc = ''
+    form.subject = ''
+    form.content = ''
 
-  emit('update:modelValue', false)
+    emit('update:modelValue', false)
+  } catch (err) {
+    alert('Failed to send email: ' + (err instanceof Error ? err.message : 'Unknown error'))
+  }
 }
 
 const handleClose = () => {

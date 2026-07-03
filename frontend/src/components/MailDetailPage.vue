@@ -158,6 +158,7 @@ const handleDelete = () => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
   background: white;
   overflow: hidden;
 }
@@ -169,6 +170,8 @@ const handleDelete = () => {
   display: flex;
   align-items: center;
   gap: 12px;
+  height: 64px;
+  flex-shrink: 0;
 }
 
 .back-btn {
@@ -192,8 +195,10 @@ const handleDelete = () => {
 }
 
 .detail-content {
-  flex: 1;
+  height: calc(100% - 64px);
+  width: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -333,7 +338,6 @@ const handleDelete = () => {
 }
 
 .mail-content {
-  flex: 1;
   padding: 16px 0;
 }
 

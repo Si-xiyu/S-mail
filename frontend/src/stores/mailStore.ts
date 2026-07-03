@@ -257,8 +257,9 @@ export const useMailStore = defineStore('mail', () => {
     error.value = null
     try {
       await apiClient.deleteMail(itemId)
-      // 更新本地状态：从列表中移除
-      mailboxItems.value = mailboxItems.value.filter(m => m.itemId !== itemId)
+      // 删除邮件后重新加载当前文件夹的邮件列表
+      // 这样可以正确显示邮件已移到回收站
+      await loadMailbox(currentLabel.value)
     } catch (err) {
       error.value = err instanceof Error ? err.message : '删除邮件失败'
     }
@@ -286,6 +287,10 @@ export const useMailStore = defineStore('mail', () => {
    */
   const selectLabel = (label: string): void => {
     currentLabel.value = label
+    // 只对真实文件夹加载邮件，STARRED 是虚拟视图，由前端计算属性过滤
+    if (label !== 'STARRED') {
+      loadMailbox(label)
+    }
   }
 
   /**
