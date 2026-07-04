@@ -26,6 +26,8 @@ CREATE TABLE mail_message (
     content_text TEXT,
     content_html TEXT,
     has_attachment BOOLEAN NOT NULL DEFAULT FALSE,
+    thread_id BIGINT,
+    parent_mail_id BIGINT,
     sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -125,6 +127,8 @@ CREATE TABLE ai_analysis_task (
 CREATE INDEX idx_mailbox_user_folder ON mailbox_item(user_id, folder, deleted_flag);
 CREATE INDEX idx_mailbox_user_received ON mailbox_item(user_id, received_at, deleted_flag);
 CREATE INDEX idx_recipient_mail ON mail_recipient(mail_id);
+CREATE INDEX idx_mail_thread ON mail_message(thread_id);
+CREATE INDEX idx_mail_parent ON mail_message(parent_mail_id);
 CREATE INDEX idx_ai_mail_user_type ON mail_ai_result(mail_id, user_id, result_type);
 CREATE INDEX idx_pending_uploader ON pending_attachment(uploader_id, status);
 CREATE INDEX idx_attachment_mail ON mail_attachment(mail_id);

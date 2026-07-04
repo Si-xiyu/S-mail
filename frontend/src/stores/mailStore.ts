@@ -29,6 +29,9 @@ export const useMailStore = defineStore('mail', () => {
   // 单个邮件详情缓存
   const mailDetailCache = ref<Map<number, MailDetail>>(new Map())
 
+  // 邮件线程缓存
+  const mailThreadCache = ref<Map<number, MailDetail[]>>(new Map())
+
   // 加载状态
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -195,7 +198,7 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 发送邮件
    */
-  const sendMail = async (to: string[], subject: string, contentText: string, cc: string[] = [], contentHtml?: string): Promise<void> => {
+  const sendMail = async (to: string[], subject: string, contentText: string, cc: string[] = [], contentHtml?: string, parentMailId?: number, threadId?: number): Promise<void> => {
     isLoading.value = true
     error.value = null
     try {
@@ -204,7 +207,9 @@ export const useMailStore = defineStore('mail', () => {
         cc,
         subject,
         contentText,
-        contentHtml
+        contentHtml,
+        parentMailId,
+        threadId
       })
       // 发送后重新加载已发送列表
       await loadMailbox('SENT')
@@ -310,6 +315,99 @@ export const useMailStore = defineStore('mail', () => {
   }
 
   /**
+   * 删除标签
+   */
+  const deleteLabel = (labelId: string): void => {
+    // 移除标签
+    const index = labels.value.findIndex(l => l.id === labelId)
+    if (index > -1) {
+      labels.value.splice(index, 1)
+    }
+  }
+
+  /**
+   * 获取邮件线程/会话（兼容方法）
+   * 返回整个线程中的所有邮件
+   */
+  const getMailThread = async (mailId: number): Promise<MailDetail[]> => {
+    // 先检查缓存
+    const cached = mailThreadCache.value.get(mailId)
+    if (cached) {
+      return cached
+    }
+
+    isLoading.value = true
+    error.value = null
+    try {
+      let thread: MailDetail[] = []
+
+      // 调用线程 API
+      try {
+        thread = await apiClient.getMailThread(mailId)
+      } catch (err) {
+        console.error('Failed to load mail thread:', err)
+        // 至少返回当前邮件
+        const current = await getMailDetail(mailId)
+        if (current) {
+          thread = [current]
+        }
+      }
+
+      // 按发送时间排序（升序）
+      thread.sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime())
+
+      mailThreadCache.value.set(mailId, thread)
+      return thread
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '获取邮件线程失败'
+      return []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * 获取邮件的对话路径（从起点到当前邮件）
+   * 相比 getMailThread，只返回需要显示的对话链
+   */
+  const getMailPath = async (mailId: number): Promise<MailDetail[]> => {
+    // 先检查缓存
+    const cached = mailThreadCache.value.get(mailId)
+    if (cached) {
+      return cached
+    }
+
+    isLoading.value = true
+    error.value = null
+    try {
+      let path: MailDetail[] = []
+
+      // 调用对话路径 API
+      try {
+        path = await apiClient.getMailPath(mailId)
+      } catch (err) {
+        console.error('Failed to load mail path:', err)
+        // 至少返回当前邮件
+        const current = await getMailDetail(mailId)
+        if (current) {
+          path = [current]
+        }
+      }
+
+      // 按发送时间排序（升序）
+      path.sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime())
+
+      mailThreadCache.value.set(mailId, path)
+      return path
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '获取邮件对话路径失败'
+      return []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
    * 切换标签/文件夹
    */
   const selectLabel = (label: string): void => {
@@ -389,6 +487,7 @@ export const useMailStore = defineStore('mail', () => {
     labels,
     mailboxItems,
     mailDetailCache,
+    mailThreadCache,
     isLoading,
     error,
 
@@ -403,6 +502,8 @@ export const useMailStore = defineStore('mail', () => {
     initializeUser,
     loadMailbox,
     getMailDetail,
+    getMailThread,
+    getMailPath,
     sendMail,
     markMailRead,
     starMail,
@@ -410,6 +511,7 @@ export const useMailStore = defineStore('mail', () => {
     moveMail,
     selectLabel,
     addLabel,
+    deleteLabel,
 
     // 向后兼容的方法
     getMailById,

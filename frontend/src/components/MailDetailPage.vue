@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import type { MailDetail } from '../types/mail'
 
 const props = defineProps<{
   mailId?: string | null
@@ -12,6 +13,10 @@ const emit = defineEmits<{
 
 const mailStore = useMailStore()
 const showLabelMenu = ref(false)
+const replyMode = ref<'none' | 'reply' | 'forward'>('none')
+const replyContent = ref('')
+const mailThread = ref<MailDetail[]>([])
+const threadLoading = ref(false)
 
 const mail = computed(() => {
   if (!props.mailId) return null
@@ -26,12 +31,84 @@ const formatDate = (timestamp: number) => {
   return new Date(timestamp).toLocaleString()
 }
 
+const formatShortDate = (timestamp: number) => {
+  const date = new Date(timestamp)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (date.toDateString() === today.toDateString()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  } else {
+    return date.toLocaleDateString()
+  }
+}
+
+// 加载邮件对话路径
+onMounted(async () => {
+  if (props.mailId) {
+    threadLoading.value = true
+    try {
+      const mailIdNum = parseInt(props.mailId, 10)
+      mailThread.value = await mailStore.getMailPath(mailIdNum)
+    } catch (err) {
+      console.error('Failed to load mail path:', err)
+    } finally {
+      threadLoading.value = false
+    }
+  }
+})
+
 const handleReply = () => {
-  console.log('Reply to:', mail.value?.senderEmail)
+  replyMode.value = 'reply'
+  replyContent.value = ''
 }
 
 const handleForward = () => {
-  console.log('Forward mail:', mail.value?.id)
+  replyMode.value = 'forward'
+  replyContent.value = ''
+}
+
+const handleCancelReply = () => {
+  replyMode.value = 'none'
+  replyContent.value = ''
+}
+
+const handleSendReply = async () => {
+  if (!replyContent.value.trim()) {
+    alert('Please enter your message')
+    return
+  }
+
+  if (!mail.value) return
+
+  try {
+    const recipients = replyMode.value === 'reply'
+      ? [mail.value.senderEmail]
+      : [mail.value.senderEmail]
+
+    const subject = replyMode.value === 'reply'
+      ? `Re: ${mail.value.subject}`
+      : `Fwd: ${mail.value.subject}`
+
+    const mailIdNum = parseInt(props.mailId || '0', 10)
+    const parentMailId = replyMode.value === 'reply' ? mailIdNum : undefined
+
+    await mailStore.sendMail(recipients, subject, replyContent.value, [], undefined, parentMailId)
+
+    replyMode.value = 'none'
+    replyContent.value = ''
+
+    // 重新加载对话路径
+    if (props.mailId) {
+      const newMailIdNum = parseInt(props.mailId, 10)
+      mailThread.value = await mailStore.getMailPath(newMailIdNum)
+    }
+  } catch (err) {
+    alert('Failed to send: ' + (err instanceof Error ? err.message : 'Unknown error'))
+  }
 }
 
 const handleMarkAsSpam = () => {
@@ -67,7 +144,6 @@ const handlePermanentDelete = () => {
 
 const handleAddToLabel = (labelId: string) => {
   if (mail.value) {
-    // 移动邮件到选中的标签
     mailStore.moveToLabel(mail.value.id, labelId)
     showLabelMenu.value = false
   }
@@ -87,104 +163,108 @@ const handleAddToLabel = (labelId: string) => {
       </button>
     </div>
 
-    <!-- 邮件内容 -->
-    <div v-if="mail" class="detail-content">
-      <div class="detail-header">
-        <div class="detail-title">
-          <h1 class="subject">{{ mail.subject }}</h1>
-          <div class="sender-info">
-            <div class="sender-avatar">
-              {{ mail.senderName.charAt(0).toUpperCase() }}
+    <!-- 邮件线程内容 -->
+    <div v-if="mail && !threadLoading" class="detail-content">
+      <!-- 邮件线程 -->
+      <div class="thread-container">
+        <div
+          v-for="(threadMail, index) in mailThread"
+          :key="index"
+          class="thread-message"
+        >
+          <div class="thread-message-header">
+            <div class="thread-message-sender">
+              <span class="sender-avatar">{{ (threadMail.senderName || threadMail.senderEmail).charAt(0).toUpperCase() }}</span>
+              <div class="sender-info-text">
+                <span class="sender-name">{{ threadMail.senderName || threadMail.senderEmail }}</span>
+                <span class="sender-email">{{ threadMail.senderEmail }}</span>
+              </div>
             </div>
-            <div class="sender-details">
-              <div class="sender-name">{{ mail.senderName }}</div>
-              <div class="sender-email">{{ mail.senderEmail }}</div>
-            </div>
-            <div class="mail-date">{{ formatDate(mail.timestamp) }}</div>
+            <span class="message-time">{{ formatShortDate(new Date(threadMail.receivedAt).getTime()) }}</span>
           </div>
-        </div>
 
-        <div class="detail-actions">
-          <button class="action-btn" @click="mailStore.toggleStar(mail.id)" title="Star">
-            <span :class="{ starred: mail.starred }">⭐</span>
-          </button>
-          <div class="label-action-wrapper">
-            <button class="action-btn" @click="showLabelMenu = !showLabelMenu" title="Label">
-              <span>🏷️</span>
-            </button>
-            <div v-if="showLabelMenu" class="label-menu">
-              <div class="label-menu-title">Add to label</div>
-              <button
-                v-for="label in mailStore.labels"
-                :key="label.id"
-                class="label-menu-item"
-                @click="handleAddToLabel(label.id)"
-              >
-                {{ label.name }}
-              </button>
-            </div>
+          <div class="thread-message-subject" v-if="index === 0">
+            <h2>{{ threadMail.subject }}</h2>
           </div>
-          <button class="action-btn" title="Archive">
-            <span>📋</span>
-          </button>
-          <button v-if="!isInTrash" class="action-btn" @click="handleDelete" title="Delete">
-            <span>🗑️</span>
-          </button>
-          <button v-if="isInTrash" class="action-btn restore" @click="handleRestore" title="Restore">
-            <span>↩️</span>
-          </button>
-          <button v-if="isInTrash" class="action-btn delete-permanent" @click="handlePermanentDelete" title="Permanently Delete">
-            <span>🔥</span>
-          </button>
-          <button class="action-btn" title="More">
-            <span>⋯</span>
-          </button>
-        </div>
-      </div>
 
-      <div class="recipients">
-        <div class="recipient-row">
-          <span class="label">To:</span>
-          <span class="value">{{ mail.to.join(', ') }}</span>
-        </div>
-        <div v-if="mail.cc?.length" class="recipient-row">
-          <span class="label">Cc:</span>
-          <span class="value">{{ mail.cc.join(', ') }}</span>
-        </div>
-      </div>
-
-      <div class="mail-content">
-        <article class="content-text">{{ mail.content }}</article>
-      </div>
-
-      <div v-if="mail.attachments?.length" class="attachments">
-        <h3>Attachments</h3>
-        <div class="attachment-list">
-          <div v-for="attachment in mail.attachments" :key="attachment.id" class="attachment-item">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8m3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5m-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11m3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
-            </svg>
-            <div class="attachment-info">
-              <div class="attachment-name">{{ attachment.filename }}</div>
-              <div class="attachment-size">{{ (attachment.size / 1024).toFixed(1) }} KB</div>
-            </div>
-            <button class="download-btn">⬇️</button>
+          <div class="thread-message-body">
+            {{ threadMail.contentText }}
           </div>
         </div>
       </div>
 
-      <div class="reply-actions">
-        <button class="reply-btn" @click="handleReply">
-          <span>⬅️</span> Reply
-        </button>
-        <button class="reply-btn" @click="handleForward">
-          <span>➡️</span> Forward
-        </button>
+      <!-- 当前邮件的操作按钮 -->
+      <div v-if="mail" class="current-mail-actions">
+        <div class="detail-header">
+          <div class="detail-title">
+            <div class="action-buttons-group">
+              <div class="detail-actions">
+                <button class="action-btn" @click="mailStore.toggleStar(mail.id)" title="Star">
+                  <span :class="{ starred: mail.starred }">⭐</span>
+                </button>
+                <div class="label-action-wrapper">
+                  <button class="action-btn" @click="showLabelMenu = !showLabelMenu" title="Label">
+                    <span>🏷️</span>
+                  </button>
+                  <div v-if="showLabelMenu" class="label-menu">
+                    <div class="label-menu-title">Add to label</div>
+                    <button
+                      v-for="label in mailStore.labels"
+                      :key="label.id"
+                      class="label-menu-item"
+                      @click="handleAddToLabel(label.id)"
+                    >
+                      {{ label.name }}
+                    </button>
+                  </div>
+                </div>
+                <button v-if="!isInTrash" class="action-btn" @click="handleDelete" title="Delete">
+                  <span>🗑️</span>
+                </button>
+                <button v-if="isInTrash" class="action-btn restore" @click="handleRestore" title="Restore">
+                  <span>↩️</span>
+                </button>
+                <button v-if="isInTrash" class="action-btn delete-permanent" @click="handlePermanentDelete" title="Permanently Delete">
+                  <span>🔥</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="reply-actions">
+          <button class="reply-btn" @click="handleReply">
+            <span>⬅️</span> Reply
+          </button>
+          <button class="reply-btn" @click="handleForward">
+            <span>➡️</span> Forward
+          </button>
+        </div>
       </div>
 
-      <div class="more-actions">
-        <button class="text-btn" @click="handleMarkAsSpam">Mark as spam</button>
-        <button class="text-btn">Report phishing</button>
+      <!-- Reply/Forward Panel -->
+      <div v-if="replyMode !== 'none'" class="reply-panel">
+        <div class="reply-header">
+          <span class="reply-label">{{ replyMode === 'reply' ? 'Reply to' : 'Forward to' }} {{ mail.senderEmail }}</span>
+          <button class="close-btn" @click="handleCancelReply">✕</button>
+        </div>
+        <textarea
+          v-model="replyContent"
+          class="reply-textarea"
+          :placeholder="replyMode === 'reply' ? 'Type your reply...' : 'Type your forwarded message...'"
+        ></textarea>
+        <div class="reply-footer">
+          <button class="send-btn" @click="handleSendReply">Send</button>
+          <button class="cancel-btn" @click="handleCancelReply">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载中 -->
+    <div v-else-if="threadLoading" class="detail-content">
+      <div class="loading-state">
+        <div class="loading-spinner">⏳</div>
+        <p>Loading conversation...</p>
       </div>
     </div>
 
@@ -565,5 +645,233 @@ const handleAddToLabel = (labelId: string) => {
 .text-btn:hover {
   color: #764ba2;
   text-decoration: underline;
+}
+
+.reply-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.reply-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 16px;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #1f2937;
+}
+
+.reply-textarea {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1f2937;
+  outline: none;
+  resize: vertical;
+  min-height: 120px;
+  background: white;
+}
+
+.reply-textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 4px rgba(102, 126, 234, 0.2);
+}
+
+.reply-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.send-btn {
+  padding: 8px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.send-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  background: white;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.thread-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.thread-message {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.thread-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.thread-message-sender {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sender-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #667eea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sender-info-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.sender-name {
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.sender-email {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.message-time {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.thread-message-subject {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.thread-message-subject h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.thread-message-body {
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.current-mail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.action-buttons-group {
+  width: 100%;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.detail-title {
+  flex: 1;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: #9ca3af;
+}
+
+.loading-spinner {
+  font-size: 48px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

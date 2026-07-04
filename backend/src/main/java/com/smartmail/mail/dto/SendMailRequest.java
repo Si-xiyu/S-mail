@@ -11,6 +11,8 @@ public record SendMailRequest(
         @NotBlank String subject,
         @NotBlank String contentText,
         String contentHtml,
-        List<Long> pendingAttachmentIds
+        List<Long> pendingAttachmentIds,
+        Long parentMailId,
+        Long threadId
 ) {
 }

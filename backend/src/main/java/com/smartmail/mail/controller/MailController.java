@@ -4,6 +4,7 @@ import com.smartmail.common.response.ApiResponse;
 import com.smartmail.mail.dto.MailDetailResponse;
 import com.smartmail.mail.dto.MailSendResponse;
 import com.smartmail.mail.dto.SendMailRequest;
+import com.smartmail.mail.entity.MailMessage;
 import com.smartmail.mail.service.MailService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/mails")
@@ -35,5 +38,15 @@ public class MailController {
     @GetMapping("/{mailId}")
     public ApiResponse<MailDetailResponse> detail(@PathVariable Long mailId) {
         return ApiResponse.ok(mailService.detail(mailId));
+    }
+
+    @GetMapping("/{mailId}/thread")
+    public ApiResponse<List<MailMessage>> getThread(@PathVariable Long mailId) {
+        return ApiResponse.ok(mailService.getThread(mailId));
+    }
+
+    @GetMapping("/{mailId}/path")
+    public ApiResponse<List<MailMessage>> getMailPath(@PathVariable Long mailId) {
+        return ApiResponse.ok(mailService.getMailPath(mailId));
     }
 }

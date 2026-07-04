@@ -17,6 +17,8 @@ public class MailMessage {
     private String contentText;
     private String contentHtml;
     private Boolean hasAttachment;
+    private Long threadId;
+    private Long parentMailId;
     private LocalDateTime sentAt;
     private LocalDateTime createdAt;
 
@@ -36,6 +38,10 @@ public class MailMessage {
     public void setContentHtml(String contentHtml) { this.contentHtml = contentHtml; }
     public Boolean getHasAttachment() { return hasAttachment; }
     public void setHasAttachment(Boolean hasAttachment) { this.hasAttachment = hasAttachment; }
+    public Long getThreadId() { return threadId; }
+    public void setThreadId(Long threadId) { this.threadId = threadId; }
+    public Long getParentMailId() { return parentMailId; }
+    public void setParentMailId(Long parentMailId) { this.parentMailId = parentMailId; }
     public LocalDateTime getSentAt() { return sentAt; }
     public void setSentAt(LocalDateTime sentAt) { this.sentAt = sentAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }

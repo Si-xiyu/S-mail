@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 const mailStore = useMailStore()
 const showAddTagInput = ref(false)
 const newTagName = ref('')
+const hoveredLabelId = ref<string | null>(null)
 
 const mainLabels = computed(() => {
   return mailStore.labels.filter(l => ['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
@@ -49,8 +50,6 @@ const handleAddTag = async () => {
   }
 
   try {
-    // 调用 mailStore 的方法来添加标签
-    // 由于后端还未实现，这里先调用方法
     await mailStore.addLabel(newTagName.value.trim())
     newTagName.value = ''
     showAddTagInput.value = false
@@ -62,6 +61,13 @@ const handleAddTag = async () => {
 const handleCancelAddTag = () => {
   newTagName.value = ''
   showAddTagInput.value = false
+}
+
+const handleDeleteLabel = (labelId: string) => {
+  if (confirm(`Delete label "${mailStore.labels.find(l => l.id === labelId)?.name}"?`)) {
+    mailStore.deleteLabel(labelId)
+    hoveredLabelId.value = null
+  }
 }
 </script>
 
@@ -96,13 +102,23 @@ const handleCancelAddTag = () => {
         <button
           v-for="label in otherLabels"
           :key="label.id"
-          class="label-item"
-          :class="{ active: isActive(label.id) }"
+          class="label-item custom-label"
+          :class="{ active: isActive(label.id), hovered: hoveredLabelId === label.id }"
           @click="selectLabel(label.id)"
+          @mouseenter="hoveredLabelId = label.id"
+          @mouseleave="hoveredLabelId = null"
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
           <span class="label-name">{{ label.name }}</span>
           <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <button
+            v-if="hoveredLabelId === label.id"
+            class="label-delete-btn"
+            @click.stop="handleDeleteLabel(label.id)"
+            title="Delete label"
+          >
+            ✕
+          </button>
         </button>
       </div>
     </nav>
@@ -222,6 +238,7 @@ const handleCancelAddTag = () => {
   transition: all 0.2s;
   width: 100%;
   justify-content: flex-start;
+  position: relative;
 }
 
 .label-item:hover {
@@ -232,6 +249,10 @@ const handleCancelAddTag = () => {
   background: #e0e7ff;
   color: #667eea;
   font-weight: 500;
+}
+
+.label-item.custom-label.hovered {
+  padding-right: 4px;
 }
 
 .label-icon {
@@ -261,6 +282,28 @@ const handleCancelAddTag = () => {
 .label-item.active .label-count {
   background: transparent;
   color: #667eea;
+}
+
+.label-delete-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.label-delete-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .sidebar-footer {

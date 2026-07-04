@@ -54,12 +54,14 @@ export interface Attachment {
  */
 export interface SendMailPayload {
   to: string[]
-  cc: string[]
+  cc?: string[]
   bcc?: string[]
   subject: string
   contentText: string
   contentHtml?: string
   pendingAttachmentIds?: number[]
+  parentMailId?: number
+  threadId?: number
 }
 
 /**

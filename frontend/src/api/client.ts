@@ -208,20 +208,27 @@ export async function moveMail(itemId: number, folder: string): Promise<void> {
 
 // ============ AI 任务 API ============
 /**
- * 运行 AI 任务
- * @param mailId 邮件 ID
- * @param task 任务类型：summary（摘要）、reply-draft（回复草稿）、analyze（分析）
- * @returns AI 任务响应
+ * 获取邮件线程（会话）
  */
-export async function runAiTask(
-  mailId: number,
-  task: 'summary' | 'reply-draft' | 'analyze'
-): Promise<AgentTaskResponse> {
-  const { data } = await http.post<ApiResponse<AgentTaskResponse>>(`/ai/mails/${mailId}/${task}`)
+export async function getMailThread(mailId: number): Promise<MailDetail[]> {
+  const { data } = await http.get<ApiResponse<MailDetail[]>>(`/mails/${mailId}/thread`)
 
   if (data.code !== 0) {
     throw new Error(data.message)
   }
 
-  return data.data
+  return data.data || []
+}
+
+/**
+ * 获取邮件的对话路径（从起点到当前邮件）
+ */
+export async function getMailPath(mailId: number): Promise<MailDetail[]> {
+  const { data } = await http.get<ApiResponse<MailDetail[]>>(`/mails/${mailId}/path`)
+
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+
+  return data.data || []
 }
