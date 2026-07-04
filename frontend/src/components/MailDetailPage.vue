@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{
   mailId?: string | null
@@ -11,10 +11,15 @@ const emit = defineEmits<{
 }>()
 
 const mailStore = useMailStore()
+const showLabelMenu = ref(false)
 
 const mail = computed(() => {
   if (!props.mailId) return null
   return mailStore.getMailById(props.mailId)
+})
+
+const isInTrash = computed(() => {
+  return mailStore.currentLabel === 'TRASH'
 })
 
 const formatDate = (timestamp: number) => {
@@ -23,10 +28,6 @@ const formatDate = (timestamp: number) => {
 
 const handleReply = () => {
   console.log('Reply to:', mail.value?.senderEmail)
-}
-
-const handleReplyAll = () => {
-  console.log('Reply all to:', mail.value?.to)
 }
 
 const handleForward = () => {
@@ -43,6 +44,32 @@ const handleDelete = () => {
   if (mail.value) {
     mailStore.deleteMail(mail.value.id)
     emit('back')
+  }
+}
+
+const handleRestore = async () => {
+  if (mail.value) {
+    try {
+      await mailStore.moveToLabel(mail.value.id, 'INBOX')
+      emit('back')
+    } catch (err) {
+      alert('Failed to restore email')
+    }
+  }
+}
+
+const handlePermanentDelete = () => {
+  if (mail.value && confirm('Are you sure you want to permanently delete this email? This action cannot be undone.')) {
+    mailStore.deleteMail(mail.value.id)
+    emit('back')
+  }
+}
+
+const handleAddToLabel = (labelId: string) => {
+  if (mail.value) {
+    // 移动邮件到选中的标签
+    mailStore.moveToLabel(mail.value.id, labelId)
+    showLabelMenu.value = false
   }
 }
 </script>
@@ -81,14 +108,33 @@ const handleDelete = () => {
           <button class="action-btn" @click="mailStore.toggleStar(mail.id)" title="Star">
             <span :class="{ starred: mail.starred }">⭐</span>
           </button>
-          <button class="action-btn" title="Label">
-            <span>🏷️</span>
-          </button>
+          <div class="label-action-wrapper">
+            <button class="action-btn" @click="showLabelMenu = !showLabelMenu" title="Label">
+              <span>🏷️</span>
+            </button>
+            <div v-if="showLabelMenu" class="label-menu">
+              <div class="label-menu-title">Add to label</div>
+              <button
+                v-for="label in mailStore.labels"
+                :key="label.id"
+                class="label-menu-item"
+                @click="handleAddToLabel(label.id)"
+              >
+                {{ label.name }}
+              </button>
+            </div>
+          </div>
           <button class="action-btn" title="Archive">
             <span>📋</span>
           </button>
-          <button class="action-btn" @click="handleDelete" title="Delete">
+          <button v-if="!isInTrash" class="action-btn" @click="handleDelete" title="Delete">
             <span>🗑️</span>
+          </button>
+          <button v-if="isInTrash" class="action-btn restore" @click="handleRestore" title="Restore">
+            <span>↩️</span>
+          </button>
+          <button v-if="isInTrash" class="action-btn delete-permanent" @click="handlePermanentDelete" title="Permanently Delete">
+            <span>🔥</span>
           </button>
           <button class="action-btn" title="More">
             <span>⋯</span>
@@ -130,9 +176,6 @@ const handleDelete = () => {
       <div class="reply-actions">
         <button class="reply-btn" @click="handleReply">
           <span>⬅️</span> Reply
-        </button>
-        <button class="reply-btn" @click="handleReplyAll">
-          <span>⬅️⬅️</span> Reply All
         </button>
         <button class="reply-btn" @click="handleForward">
           <span>➡️</span> Forward
@@ -290,6 +333,52 @@ const handleDelete = () => {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  position: relative;
+}
+
+.label-action-wrapper {
+  position: relative;
+}
+
+.label-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 160px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.label-menu-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.label-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #374151;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.label-menu-item:hover {
+  background: #f3f4f6;
 }
 
 .action-btn {
@@ -308,6 +397,28 @@ const handleDelete = () => {
 
 .action-btn:hover {
   background: #f9fafb;
+}
+
+.action-btn.restore {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.action-btn.restore:hover {
+  background: #f0fdf4;
+  border-color: #059669;
+  color: #059669;
+}
+
+.action-btn.delete-permanent {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.action-btn.delete-permanent:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+  color: #dc2626;
 }
 
 .action-btn span.starred {

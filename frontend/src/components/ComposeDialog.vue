@@ -16,8 +16,6 @@ const mailStore = useMailStore()
 
 const form = reactive({
   to: '',
-  cc: '',
-  bcc: '',
   subject: '',
   content: ''
 })
@@ -31,15 +29,12 @@ const handleSend = async () => {
   }
 
   const toList = form.to.split(',').map(e => e.trim()).filter(Boolean)
-  const ccList = form.cc.split(',').map(e => e.trim()).filter(Boolean)
 
   try {
-    await mailStore.sendMail(toList, form.subject, form.content, ccList.length > 0 ? ccList : undefined)
+    await mailStore.sendMail(toList, form.subject, form.content)
 
     // Reset form
     form.to = ''
-    form.cc = ''
-    form.bcc = ''
     form.subject = ''
     form.content = ''
 
@@ -79,24 +74,6 @@ const handleMinimize = () => {
             class="form-input"
             placeholder="To"
             multiple
-          />
-        </div>
-
-        <div class="form-group">
-          <input
-            v-model="form.cc"
-            type="text"
-            class="form-input"
-            placeholder="Cc"
-          />
-        </div>
-
-        <div class="form-group">
-          <input
-            v-model="form.bcc"
-            type="text"
-            class="form-input"
-            placeholder="Bcc"
           />
         </div>
 

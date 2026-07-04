@@ -283,6 +283,33 @@ export const useMailStore = defineStore('mail', () => {
   }
 
   /**
+   * 添加新标签
+   */
+  const addLabel = async (labelName: string): Promise<void> => {
+    error.value = null
+    try {
+      // 生成标签 ID（大写，空格转换为下划线）
+      const labelId = labelName.toUpperCase().replace(/\s+/g, '_')
+
+      // 检查是否已存在相同的标签
+      if (labels.value.some(l => l.id === labelId)) {
+        throw new Error('标签已存在')
+      }
+
+      // 添加新标签到本地状态
+      labels.value.push({
+        id: labelId,
+        name: labelName,
+        count: 0,
+        color: '#667eea'
+      })
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '添加标签失败'
+      throw err
+    }
+  }
+
+  /**
    * 切换标签/文件夹
    */
   const selectLabel = (label: string): void => {
@@ -382,6 +409,7 @@ export const useMailStore = defineStore('mail', () => {
     deleteMail: deleteMailCompat,
     moveMail,
     selectLabel,
+    addLabel,
 
     // 向后兼容的方法
     getMailById,

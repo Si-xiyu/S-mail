@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const mailStore = useMailStore()
+const showAddTagInput = ref(false)
+const newTagName = ref('')
 
 const mainLabels = computed(() => {
   return mailStore.labels.filter(l => ['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
@@ -38,6 +40,28 @@ const getLabelIcon = (labelId: string) => {
     SPAM: '🚫'
   }
   return icons[labelId] || '📁'
+}
+
+const handleAddTag = async () => {
+  if (!newTagName.value.trim()) {
+    alert('Please enter a tag name')
+    return
+  }
+
+  try {
+    // 调用 mailStore 的方法来添加标签
+    // 由于后端还未实现，这里先调用方法
+    await mailStore.addLabel(newTagName.value.trim())
+    newTagName.value = ''
+    showAddTagInput.value = false
+  } catch (err) {
+    alert('Failed to add tag: ' + (err instanceof Error ? err.message : 'Unknown error'))
+  }
+}
+
+const handleCancelAddTag = () => {
+  newTagName.value = ''
+  showAddTagInput.value = false
 }
 </script>
 
@@ -84,7 +108,22 @@ const getLabelIcon = (labelId: string) => {
     </nav>
 
     <div class="sidebar-footer">
-      <button class="add-tag-btn" title="Add Tag">
+      <div v-if="showAddTagInput" class="add-tag-input-container">
+        <input
+          v-model="newTagName"
+          type="text"
+          class="tag-input"
+          placeholder="Tag name"
+          @keyup.enter="handleAddTag"
+          @keyup.esc="handleCancelAddTag"
+          autofocus
+        />
+        <div class="input-actions">
+          <button class="action-btn confirm" @click="handleAddTag" title="Confirm">✓</button>
+          <button class="action-btn cancel" @click="handleCancelAddTag" title="Cancel">✕</button>
+        </div>
+      </div>
+      <button v-else class="add-tag-btn" @click="showAddTagInput = true" title="Add Tag">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 5v14M5 12h14" />
         </svg>
@@ -111,6 +150,7 @@ const getLabelIcon = (labelId: string) => {
 <style scoped>
 .sidebar {
   width: 240px;
+  flex-shrink: 0;
   background: #fff;
   border-right: 1px solid #e5e7eb;
   display: flex;
@@ -256,6 +296,66 @@ const getLabelIcon = (labelId: string) => {
 
 .add-tag-btn svg {
   flex: 0 0 20px;
+}
+
+.add-tag-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.tag-input {
+  padding: 8px 10px;
+  border: 1px solid #667eea;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tag-input:focus {
+  border-color: #764ba2;
+  box-shadow: 0 0 4px rgba(102, 126, 234, 0.2);
+}
+
+.input-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.input-actions .action-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.input-actions .action-btn.confirm {
+  color: #10b981;
+  border-color: #10b981;
+}
+
+.input-actions .action-btn.confirm:hover {
+  background: #f0fdf4;
+  border-color: #059669;
+}
+
+.input-actions .action-btn.cancel {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.input-actions .action-btn.cancel:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
 }
 
 .footer-buttons {
