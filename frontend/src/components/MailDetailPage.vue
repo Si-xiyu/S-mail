@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import type { MailDetail } from '../types/mail'
 
 const props = defineProps<{
@@ -17,6 +17,17 @@ const replyMode = ref<'none' | 'reply' | 'forward'>('none')
 const replyContent = ref('')
 const mailThread = ref<MailDetail[]>([])
 const threadLoading = ref(false)
+const labelMenuRef = ref<HTMLElement | null>(null)
+const labelButtonRef = ref<HTMLElement | null>(null)
+const labelMenuPosition = ref({ top: 0, left: 240 })
+
+// 系统自带标签的 ID 列表
+const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
+
+// 只显示用户个性化标签
+const customLabels = computed(() => {
+  return mailStore.labels.filter(l => !SYSTEM_LABEL_IDS.includes(l.id))
+})
 
 const mail = computed(() => {
   if (!props.mailId) return null
@@ -59,6 +70,37 @@ onMounted(async () => {
       threadLoading.value = false
     }
   }
+})
+
+// 监听标签菜单显示状态，更新位置
+watch(showLabelMenu, (newVal) => {
+  if (newVal && labelButtonRef.value) {
+    const rect = labelButtonRef.value.getBoundingClientRect()
+    labelMenuPosition.value = {
+      top: rect.bottom + 4,
+      left: 240
+    }
+    // 延迟添加全局点击监听，避免立即关闭
+    setTimeout(() => {
+      document.addEventListener('click', handleMenuClickOutside)
+    }, 0)
+  } else {
+    document.removeEventListener('click', handleMenuClickOutside)
+  }
+})
+
+const handleMenuClickOutside = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (labelMenuRef.value && labelButtonRef.value) {
+    if (!labelMenuRef.value.contains(target) && !labelButtonRef.value.contains(target)) {
+      showLabelMenu.value = false
+    }
+  }
+}
+
+// 组件卸载时清理事件监听器
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleMenuClickOutside)
 })
 
 const handleReply = () => {
@@ -127,11 +169,22 @@ const handleDelete = () => {
 const handleRestore = async () => {
   if (mail.value) {
     try {
-      await mailStore.moveToLabel(mail.value.id, 'INBOX')
+      // 后端会根据 originalFolder 自动恢复到原来的位置
+      // 这里传任意 folder（后端会忽略），后端会用 originalFolder
+      await mailStore.moveToLabel(mail.value.id, 'RESTORE')
       emit('back')
     } catch (err) {
       alert('Failed to restore email')
     }
+  }
+}
+
+const handleToggleStar = async () => {
+  if (!mail.value || mail.value.itemId === undefined) return
+  try {
+    await mailStore.starMail(mail.value.itemId, !mail.value.starred)
+  } catch (err) {
+    alert('Failed to toggle star: ' + (err instanceof Error ? err.message : 'Unknown error'))
   }
 }
 
@@ -142,10 +195,15 @@ const handlePermanentDelete = () => {
   }
 }
 
-const handleAddToLabel = (labelId: string) => {
-  if (mail.value) {
-    mailStore.moveToLabel(mail.value.id, labelId)
+const handleAddToLabel = async (labelId: string) => {
+  if (!mail.value) return
+
+  try {
+    // 添加到自定义标签（复制方式，原邮件不删除）
+    await mailStore.changeCategory(mail.value.id, labelId)
     showLabelMenu.value = false
+  } catch (err) {
+    alert('Failed to add to label: ' + (err instanceof Error ? err.message : 'Unknown error'))
   }
 }
 </script>
@@ -199,17 +257,20 @@ const handleAddToLabel = (labelId: string) => {
           <div class="detail-title">
             <div class="action-buttons-group">
               <div class="detail-actions">
-                <button class="action-btn" @click="mailStore.toggleStar(mail.id)" title="Star">
+                <button class="action-btn" @click="handleToggleStar" title="Star">
                   <span :class="{ starred: mail.starred }">⭐</span>
                 </button>
                 <div class="label-action-wrapper">
-                  <button class="action-btn" @click="showLabelMenu = !showLabelMenu" title="Label">
+                  <button ref="labelButtonRef" class="action-btn" @click="showLabelMenu = !showLabelMenu" title="Label">
                     <span>🏷️</span>
                   </button>
-                  <div v-if="showLabelMenu" class="label-menu">
-                    <div class="label-menu-title">Add to label</div>
+                  <div v-if="showLabelMenu" ref="labelMenuRef" class="label-menu" :style="{ top: labelMenuPosition.top + 'px', left: labelMenuPosition.left + 'px' }">
+                    <div class="label-menu-title">Add to Custom Tag</div>
+                    <div v-if="customLabels.length === 0" class="label-menu-empty">
+                      No custom tags yet. Create one in the sidebar!
+                    </div>
                     <button
-                      v-for="label in mailStore.labels"
+                      v-for="label in customLabels"
                       :key="label.id"
                       class="label-menu-item"
                       @click="handleAddToLabel(label.id)"
@@ -421,16 +482,15 @@ const handleAddToLabel = (labelId: string) => {
 }
 
 .label-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
+  position: fixed;
+  top: 0;
+  left: 240px;
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  z-index: 1000;
   min-width: 160px;
-  margin-top: 4px;
   overflow: hidden;
 }
 
@@ -459,6 +519,14 @@ const handleAddToLabel = (labelId: string) => {
 
 .label-menu-item:hover {
   background: #f3f4f6;
+}
+
+.label-menu-empty {
+  padding: 12px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .action-btn {

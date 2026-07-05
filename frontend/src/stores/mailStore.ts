@@ -40,10 +40,13 @@ export const useMailStore = defineStore('mail', () => {
 
   // 获取当前标签的邮件列表
   const currentMailItems = computed((): MailboxItem[] => {
+    // STARRED 是虚拟视图，由前端过滤
     if (currentLabel.value === 'STARRED') {
       return mailboxItems.value.filter(m => m.starred)
     }
-    return mailboxItems.value.filter(m => m.folder === currentLabel.value)
+    // 其他情况（标准文件夹或自定义分类），从后端已经过滤好的 mailboxItems 中直接使用
+    // 因为 loadMailbox() 会根据 folder 或 categoryId 从后端加载正确的邮件
+    return mailboxItems.value
   })
 
   // 转换为旧格式的 MailItem 用于向后兼容
@@ -79,6 +82,8 @@ export const useMailStore = defineStore('mail', () => {
       }
       localStorage.setItem('smartmail_user', JSON.stringify(user.value))
       await loadMailbox('INBOX')
+      // 加载分类
+      await initializeCategories()
     } catch (err) {
       error.value = err instanceof Error ? err.message : '登录失败'
       throw err
@@ -102,6 +107,8 @@ export const useMailStore = defineStore('mail', () => {
       }
       localStorage.setItem('smartmail_user', JSON.stringify(user.value))
       await loadMailbox('INBOX')
+      // 加载分类
+      await initializeCategories()
     } catch (err) {
       error.value = err instanceof Error ? err.message : '注册失败'
       throw err
@@ -126,13 +133,20 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 初始化用户状态（从 localStorage 恢复）
    */
-  const initializeUser = (): void => {
+  const initializeUser = async (): Promise<void> => {
     const token = localStorage.getItem('smartmail_token')
     if (token) {
       const userStr = localStorage.getItem('smartmail_user')
       if (userStr) {
         try {
           user.value = JSON.parse(userStr)
+          // 只在用户成功恢复后才尝试加载分类
+          try {
+            await initializeCategories()
+          } catch (err) {
+            // 如果加载分类失败（可能是 token 过期），静默失败
+            console.debug('Failed to initialize categories during startup:', err)
+          }
         } catch (err) {
           console.error('Failed to restore user from localStorage:', err)
           user.value = null
@@ -159,6 +173,41 @@ export const useMailStore = defineStore('mail', () => {
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载邮箱失败'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * 加载所有标星邮件
+   */
+  const loadStarredMails = async (): Promise<void> => {
+    isLoading.value = true
+    error.value = null
+    try {
+      // 从所有标准 folder 加载邮件，过滤出标星的
+      const folders = ['INBOX', 'SENT', 'TRASH', 'JUNK']
+      const allStarred: MailboxItem[] = []
+
+      for (const folder of folders) {
+        try {
+          const items = await apiClient.listMailbox(folder, 1, 100)
+          const starred = items.filter(item => item.starred)
+          allStarred.push(...starred)
+        } catch (err) {
+          // 如果是认证错误，忽略
+          if (err instanceof Error && err.message.includes('登录')) {
+            console.debug(`Skipping ${folder} due to auth error`)
+            continue
+          }
+          console.error(`Failed to load ${folder}:`, err)
+        }
+      }
+
+      mailboxItems.value = allStarred
+      currentLabel.value = 'STARRED'
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '加载星标邮件失败'
     } finally {
       isLoading.value = false
     }
@@ -293,20 +342,15 @@ export const useMailStore = defineStore('mail', () => {
   const addLabel = async (labelName: string): Promise<void> => {
     error.value = null
     try {
-      // 生成标签 ID（大写，空格转换为下划线）
-      const labelId = labelName.toUpperCase().replace(/\s+/g, '_')
+      // 调用后端 API 创建分类
+      const category = await apiClient.createCategory(labelName, '#667eea')
 
-      // 检查是否已存在相同的标签
-      if (labels.value.some(l => l.id === labelId)) {
-        throw new Error('标签已存在')
-      }
-
-      // 添加新标签到本地状态
+      // 添加到本地状态
       labels.value.push({
-        id: labelId,
-        name: labelName,
+        id: category.id.toString(),
+        name: category.name,
         count: 0,
-        color: '#667eea'
+        color: category.color
       })
     } catch (err) {
       error.value = err instanceof Error ? err.message : '添加标签失败'
@@ -317,11 +361,28 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 删除标签
    */
-  const deleteLabel = (labelId: string): void => {
-    // 移除标签
-    const index = labels.value.findIndex(l => l.id === labelId)
-    if (index > -1) {
-      labels.value.splice(index, 1)
+  const deleteLabel = async (labelId: string): Promise<void> => {
+    error.value = null
+    try {
+      const categoryId = parseInt(labelId, 10)
+      if (isNaN(categoryId)) {
+        // 如果不是数字 ID，直接删除本地状态
+        const index = labels.value.findIndex(l => l.id === labelId)
+        if (index > -1) {
+          labels.value.splice(index, 1)
+        }
+      } else {
+        // 调用后端 API 删除分类
+        await apiClient.deleteCategory(categoryId)
+        // 删除本地状态
+        const index = labels.value.findIndex(l => l.id === labelId)
+        if (index > -1) {
+          labels.value.splice(index, 1)
+        }
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '删除标签失败'
+      throw err
     }
   }
 
@@ -412,8 +473,11 @@ export const useMailStore = defineStore('mail', () => {
    */
   const selectLabel = (label: string): void => {
     currentLabel.value = label
-    // 只对真实文件夹加载邮件，STARRED 是虚拟视图，由前端计算属性过滤
-    if (label !== 'STARRED') {
+    // STARRED 需要从后端加载所有标星邮件（跨 folder）
+    if (label === 'STARRED') {
+      loadStarredMails()
+    } else {
+      // 其他标签（folder 或 category ID）从后端加载
       loadMailbox(label)
     }
   }
@@ -428,6 +492,7 @@ export const useMailStore = defineStore('mail', () => {
 
     return {
       id: item.mailId.toString(),
+      itemId: item.itemId,
       subject: item.subject,
       senderName: '',
       senderEmail: item.senderEmail,
@@ -480,6 +545,46 @@ export const useMailStore = defineStore('mail', () => {
     }
   }
 
+  /**
+   * 将邮件添加到分类
+   */
+  const changeCategory = async (id: string, categoryId: string): Promise<void> => {
+    error.value = null
+    try {
+      const mailId = parseInt(id, 10)
+      const catId = parseInt(categoryId, 10)
+      const item = mailboxItems.value.find(m => m.mailId === mailId)
+      if (item) {
+        await apiClient.changeCategory(item.itemId, catId)
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '添加到分类失败'
+      throw err
+    }
+  }
+
+  /**
+   * 初始化：加载分类列表
+   */
+  const initializeCategories = async (): Promise<void> => {
+    error.value = null
+    try {
+      const categories = await apiClient.listCategories()
+      // 将后端的分类转换为前端的标签格式
+      const customLabels = categories.map(cat => ({
+        id: cat.id.toString(),
+        name: cat.name,
+        count: 0,
+        color: cat.color
+      }))
+      // 替换现有的自定义标签（保留标准的文件夹标签）
+      const standardLabelIds = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
+      labels.value = labels.value.filter(l => standardLabelIds.includes(l.id)).concat(customLabels)
+    } catch (err) {
+      console.error('Failed to load categories:', err)
+    }
+  }
+
   return {
     // 状态
     user,
@@ -501,6 +606,7 @@ export const useMailStore = defineStore('mail', () => {
     logout,
     initializeUser,
     loadMailbox,
+    loadStarredMails,
     getMailDetail,
     getMailThread,
     getMailPath,
@@ -509,9 +615,11 @@ export const useMailStore = defineStore('mail', () => {
     starMail,
     deleteMail: deleteMailCompat,
     moveMail,
+    changeCategory,
     selectLabel,
     addLabel,
     deleteLabel,
+    initializeCategories,
 
     // 向后兼容的方法
     getMailById,

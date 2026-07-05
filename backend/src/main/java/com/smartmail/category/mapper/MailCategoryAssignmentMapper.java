@@ -23,6 +23,17 @@ public interface MailCategoryAssignmentMapper extends BaseMapper<MailCategoryAss
     @Select("""
             SELECT a.* FROM mail_category_assignment a
             JOIN mail_category c ON a.category_id = c.id
+            WHERE a.mail_id = #{mailId}
+              AND a.user_id = #{userId}
+              AND a.category_id = #{categoryId}
+              AND c.user_id = #{userId}
+            LIMIT 1
+            """)
+    MailCategoryAssignment findByMailAndUserAndCategory(Long mailId, Long userId, Long categoryId);
+
+    @Select("""
+            SELECT a.* FROM mail_category_assignment a
+            JOIN mail_category c ON a.category_id = c.id
             WHERE c.id = #{categoryId}
               AND a.user_id = #{userId}
               AND c.user_id = #{userId}

@@ -1,3 +1,16 @@
+-- Drop existing tables to ensure clean schema
+DROP TABLE IF EXISTS ai_analysis_task;
+DROP TABLE IF EXISTS mail_ai_result;
+DROP TABLE IF EXISTS mail_category_assignment;
+DROP TABLE IF EXISTS mail_category;
+DROP TABLE IF EXISTS mail_attachment;
+DROP TABLE IF EXISTS pending_attachment;
+DROP TABLE IF EXISTS mailbox_item;
+DROP TABLE IF EXISTS mail_recipient;
+DROP TABLE IF EXISTS mail_message;
+DROP TABLE IF EXISTS user_setting;
+DROP TABLE IF EXISTS sys_user;
+
 CREATE TABLE sys_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(128) NOT NULL UNIQUE,
@@ -47,6 +60,7 @@ CREATE TABLE mailbox_item (
     user_id BIGINT NOT NULL,
     mail_id BIGINT NOT NULL,
     folder VARCHAR(20) NOT NULL,
+    original_folder VARCHAR(20),
     read_flag BOOLEAN NOT NULL DEFAULT FALSE,
     star_flag BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,

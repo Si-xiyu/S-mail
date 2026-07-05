@@ -13,6 +13,7 @@ public class MailboxItem {
     private Long userId;
     private Long mailId;
     private String folder;
+    private String originalFolder;
     private Boolean readFlag;
     private Boolean starFlag;
     private Boolean deletedFlag;
@@ -28,6 +29,8 @@ public class MailboxItem {
     public void setMailId(Long mailId) { this.mailId = mailId; }
     public String getFolder() { return folder; }
     public void setFolder(String folder) { this.folder = folder; }
+    public String getOriginalFolder() { return originalFolder; }
+    public void setOriginalFolder(String originalFolder) { this.originalFolder = originalFolder; }
     public Boolean getReadFlag() { return readFlag; }
     public void setReadFlag(Boolean readFlag) { this.readFlag = readFlag; }
     public Boolean getStarFlag() { return starFlag; }

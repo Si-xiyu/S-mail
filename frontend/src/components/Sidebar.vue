@@ -7,12 +7,19 @@ const showAddTagInput = ref(false)
 const newTagName = ref('')
 const hoveredLabelId = ref<string | null>(null)
 
-const mainLabels = computed(() => {
-  return mailStore.labels.filter(l => ['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
+// 系统自带标签的 ID 列表
+const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
+
+// 系统自带标签（按照指定的顺序）
+const systemLabels = computed(() => {
+  return SYSTEM_LABEL_IDS
+    .map(id => mailStore.labels.find(l => l.id === id))
+    .filter(l => l !== undefined) as typeof mailStore.labels
 })
 
-const otherLabels = computed(() => {
-  return mailStore.labels.filter(l => !['INBOX', 'STARRED', 'SENT', 'DRAFTS'].includes(l.id))
+// 用户个性化标签
+const customLabels = computed(() => {
+  return mailStore.labels.filter(l => !SYSTEM_LABEL_IDS.includes(l.id))
 })
 
 const isActive = (labelId: string) => {
@@ -63,10 +70,14 @@ const handleCancelAddTag = () => {
   showAddTagInput.value = false
 }
 
-const handleDeleteLabel = (labelId: string) => {
+const handleDeleteLabel = async (labelId: string) => {
   if (confirm(`Delete label "${mailStore.labels.find(l => l.id === labelId)?.name}"?`)) {
-    mailStore.deleteLabel(labelId)
-    hoveredLabelId.value = null
+    try {
+      await mailStore.deleteLabel(labelId)
+      hoveredLabelId.value = null
+    } catch (err) {
+      alert('Failed to delete label: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    }
   }
 }
 </script>
@@ -84,9 +95,11 @@ const handleDeleteLabel = (labelId: string) => {
     </div>
 
     <nav class="labels-section">
+      <!-- 系统自带标签 -->
       <div class="labels-group">
+        <div class="group-title">System Tags</div>
         <button
-          v-for="label in mainLabels"
+          v-for="label in systemLabels"
           :key="label.id"
           class="label-item"
           :class="{ active: isActive(label.id) }"
@@ -98,9 +111,11 @@ const handleDeleteLabel = (labelId: string) => {
         </button>
       </div>
 
-      <div class="labels-group">
+      <!-- 用户个性化标签 -->
+      <div v-if="customLabels.length > 0" class="labels-group">
+        <div class="group-title">Custom Tags</div>
         <button
-          v-for="label in otherLabels"
+          v-for="label in customLabels"
           :key="label.id"
           class="label-item custom-label"
           :class="{ active: isActive(label.id), hovered: hoveredLabelId === label.id }"
@@ -214,6 +229,16 @@ const handleDeleteLabel = (labelId: string) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.group-title {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #9ca3af;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
 }
 
 .section-title {

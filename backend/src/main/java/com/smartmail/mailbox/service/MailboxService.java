@@ -34,12 +34,38 @@ public class MailboxService {
         Long userId = UserContext.requireUserId();
         long safePage = Math.max(page, 1);
         long safeSize = Math.min(Math.max(pageSize, 1), 50);
-        List<MailboxItemResponse> records = mailboxMapper
-                .listByFolder(userId, normalizeFolder(folder), safeSize, (safePage - 1) * safeSize)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-        long total = mailboxMapper.countByFolder(userId, normalizeFolder(folder));
+
+        List<MailboxItemResponse> records;
+        long total;
+
+        // 判断是否是自定义分类（数字 ID）还是标准文件夹
+        if (isNumeric(folder)) {
+            // 按分类查询
+            long categoryId = Long.parseLong(folder);
+            // 获取该分类下的所有邮件 ID
+            List<Long> mailIds = categoryService.getMailIdsByCategory(categoryId, userId);
+
+            if (mailIds.isEmpty()) {
+                records = List.of();
+                total = 0;
+            } else {
+                records = mailboxMapper
+                        .listByMailIds(userId, mailIds, safeSize, (safePage - 1) * safeSize)
+                        .stream()
+                        .map(this::toResponse)
+                        .toList();
+                total = mailboxMapper.countByMailIds(userId, mailIds);
+            }
+        } else {
+            // 按文件夹查询（标准文件夹）
+            records = mailboxMapper
+                    .listByFolder(userId, normalizeFolder(folder), safeSize, (safePage - 1) * safeSize)
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+            total = mailboxMapper.countByFolder(userId, normalizeFolder(folder));
+        }
+
         return new PageResponse<>(records, total, safePage, safeSize);
     }
 
@@ -60,13 +86,33 @@ public class MailboxService {
     public void move(Long itemId, String folder) {
         MailboxItem item = requireOwnedItem(itemId);
         String targetFolder = normalizeFolder(folder);
-        if (!MOVABLE_FOLDERS.contains(targetFolder)) {
-            throw new BusinessException(400, "Unsupported mailbox folder");
+
+        // 特殊处理：RESTORE 表示从 TRASH 恢复到原来的位置
+        if ("RESTORE".equals(targetFolder)) {
+            if (!"TRASH".equals(item.getFolder())) {
+                throw new BusinessException(400, "Only items in trash can be restored");
+            }
+            if (item.getOriginalFolder() != null) {
+                item.setFolder(item.getOriginalFolder());
+                item.setOriginalFolder(null);
+            } else {
+                // 如果没有 originalFolder，默认恢复到 INBOX
+                item.setFolder("INBOX");
+            }
+        } else {
+            // 普通移动操作
+            if (!MOVABLE_FOLDERS.contains(targetFolder)) {
+                throw new BusinessException(400, "Unsupported mailbox folder");
+            }
+            if ("SENT".equals(targetFolder) && !"SENT".equals(item.getFolder())) {
+                throw new BusinessException(400, "Only sent items can be restored to Sent");
+            }
+
+            // 移动到目标 folder，并清除 originalFolder
+            item.setFolder(targetFolder);
+            item.setOriginalFolder(null);
         }
-        if ("SENT".equals(targetFolder) && !"SENT".equals(item.getFolder())) {
-            throw new BusinessException(400, "Only sent items can be restored to Sent");
-        }
-        item.setFolder(targetFolder);
+
         item.setUpdatedAt(LocalDateTime.now());
         mailboxMapper.updateById(item);
 
@@ -74,9 +120,9 @@ public class MailboxService {
                 categoryService.findDefaultCategory(UserContext.requireUserId(), CategoryService.DEFAULT_JUNK);
         com.smartmail.category.entity.MailCategory otherCat =
                 categoryService.findDefaultCategory(UserContext.requireUserId(), CategoryService.DEFAULT_OTHER);
-        if ("JUNK".equals(targetFolder) && junkCat != null) {
+        if ("JUNK".equals(item.getFolder()) && junkCat != null) {
             categoryService.assignCategory(item.getMailId(), junkCat.getId(), "MANUAL");
-        } else if ("INBOX".equals(targetFolder) && junkCat != null) {
+        } else if ("INBOX".equals(item.getFolder()) && junkCat != null) {
             com.smartmail.category.entity.MailCategory currentCat =
                     categoryService.getCategoryForMail(item.getMailId(), UserContext.requireUserId());
             if (currentCat != null && CategoryService.DEFAULT_JUNK.equals(currentCat.getName()) && otherCat != null) {
@@ -90,6 +136,8 @@ public class MailboxService {
         if ("TRASH".equals(item.getFolder())) {
             item.setDeletedFlag(true);
         } else {
+            // 保存原始 folder，用于恢复时使用
+            item.setOriginalFolder(item.getFolder());
             item.setFolder("TRASH");
         }
         item.setUpdatedAt(LocalDateTime.now());
@@ -103,6 +151,9 @@ public class MailboxService {
 
     private MailboxItemResponse toResponse(MailboxItem item) {
         MailMessage message = mailMapper.selectById(item.getMailId());
+        if (message == null) {
+            throw new BusinessException(500, "邮件消息不存在: mailId=" + item.getMailId());
+        }
         String content = message.getContentText() == null ? "" : message.getContentText().replaceAll("\\s+", " ");
         String preview = content.length() > 80 ? content.substring(0, 80) : content;
         return new MailboxItemResponse(
@@ -131,5 +182,17 @@ public class MailboxService {
 
     private String normalizeFolder(String folder) {
         return folder == null || folder.isBlank() ? "INBOX" : folder.trim().toUpperCase();
+    }
+
+    private boolean isNumeric(String str) {
+        if (str == null || str.isBlank()) {
+            return false;
+        }
+        try {
+            Long.parseLong(str.trim());
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

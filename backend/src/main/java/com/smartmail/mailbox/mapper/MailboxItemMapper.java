@@ -161,4 +161,35 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
               AND received_at > #{since}
             """)
     long countSince(Long userId, LocalDateTime since);
+
+    @Select("""
+            <script>
+            SELECT * FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND mail_id IN
+              <foreach item="mailId" collection="mailIds" open="(" separator="," close=")">
+                #{mailId}
+              </foreach>
+            ORDER BY received_at DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<MailboxItem> listByMailIds(@Param("userId") Long userId,
+                                     @Param("mailIds") List<Long> mailIds,
+                                     @Param("limit") long limit,
+                                     @Param("offset") long offset);
+
+    @Select("""
+            <script>
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND mail_id IN
+              <foreach item="mailId" collection="mailIds" open="(" separator="," close=")">
+                #{mailId}
+              </foreach>
+            </script>
+            """)
+    long countByMailIds(@Param("userId") Long userId, @Param("mailIds") List<Long> mailIds);
 }

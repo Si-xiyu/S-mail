@@ -4,6 +4,7 @@
 
 export interface Mail {
   id: string
+  itemId?: number
   subject: string
   senderName: string
   senderEmail: string

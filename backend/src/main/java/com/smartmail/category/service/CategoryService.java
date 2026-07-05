@@ -122,20 +122,21 @@ public class CategoryService {
     public void assignCategoryForUser(Long mailId, Long userId, Long categoryId, String source) {
         requireOwned(categoryId, userId);
 
-        MailCategoryAssignment existing = assignmentMapper.findByMailAndUser(mailId, userId);
+        // 检查是否已经有这个分类的关联
+        MailCategoryAssignment existing = assignmentMapper.findByMailAndUserAndCategory(mailId, userId, categoryId);
         if (existing != null) {
-            existing.setCategoryId(categoryId);
-            existing.setAssignmentSource(source);
-            assignmentMapper.updateById(existing);
-        } else {
-            MailCategoryAssignment assignment = new MailCategoryAssignment();
-            assignment.setUserId(userId);
-            assignment.setCategoryId(categoryId);
-            assignment.setMailId(mailId);
-            assignment.setAssignmentSource(source);
-            assignment.setCreatedAt(LocalDateTime.now());
-            assignmentMapper.insert(assignment);
+            // 已经有这个分类的关联，不需要重复创建
+            return;
         }
+
+        // 创建新的分类关联（支持一个邮件有多个分类）
+        MailCategoryAssignment assignment = new MailCategoryAssignment();
+        assignment.setUserId(userId);
+        assignment.setCategoryId(categoryId);
+        assignment.setMailId(mailId);
+        assignment.setAssignmentSource(source);
+        assignment.setCreatedAt(LocalDateTime.now());
+        assignmentMapper.insert(assignment);
     }
 
     public MailCategory findDefaultCategory(Long userId, String name) {
@@ -144,6 +145,10 @@ public class CategoryService {
                 .filter(c -> name.equals(c.getName()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    public List<Long> getMailIdsByCategory(Long categoryId, Long userId) {
+        return assignmentMapper.listMailIdsByCategory(categoryId, userId);
     }
 
     public MailCategory getCategoryForMail(Long mailId, Long userId) {

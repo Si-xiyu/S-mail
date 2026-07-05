@@ -258,6 +258,17 @@ public class MailService {
     }
 
     /**
+     * 递归获取邮件的所有回复，添加到 thread 列表
+     */
+    private void addReplies(Long parentMailId, List<MailMessage> thread) {
+        List<MailMessage> replies = mailMapper.findByParentMailId(parentMailId);
+        for (MailMessage reply : replies) {
+            thread.add(reply);
+            addReplies(reply.getId(), thread);
+        }
+    }
+
+    /**
      * 发送邮件时处理线程
      */
     public Long resolveThreadId(String subject, Long parentMailId) {

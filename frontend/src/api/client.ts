@@ -232,3 +232,65 @@ export async function getMailPath(mailId: number): Promise<MailDetail[]> {
 
   return data.data || []
 }
+
+// ============ 分类 API ============
+interface CategoryResponse {
+  id: number
+  name: string
+  color: string
+  sortOrder: number
+  createdAt: string
+}
+
+/**
+ * 获取所有分类
+ */
+export async function listCategories(): Promise<CategoryResponse[]> {
+  const { data } = await http.get<ApiResponse<CategoryResponse[]>>('/categories')
+
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+
+  return data.data || []
+}
+
+/**
+ * 创建分类
+ * @param name 分类名称
+ * @param color 分类颜色（十六进制颜色码，如 #667eea）
+ */
+export async function createCategory(name: string, color: string = '#667eea'): Promise<CategoryResponse> {
+  const { data } = await http.post<ApiResponse<CategoryResponse>>('/categories', { name, color })
+
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+
+  return data.data
+}
+
+/**
+ * 删除分类
+ * @param categoryId 分类 ID
+ */
+export async function deleteCategory(categoryId: number): Promise<void> {
+  const { data } = await http.delete<ApiResponse<void>>(`/categories/${categoryId}`)
+
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+}
+
+/**
+ * 将邮件添加到分类
+ * @param itemId 邮箱项 ID
+ * @param categoryId 分类 ID
+ */
+export async function changeCategory(itemId: number, categoryId: number): Promise<void> {
+  const { data } = await http.patch<ApiResponse<void>>(`/mailbox/items/${itemId}/category`, { categoryId })
+
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+}
