@@ -7,6 +7,7 @@ import TopBar from '../components/TopBar.vue'
 import Sidebar from '../components/Sidebar.vue'
 import MailList from '../components/MailList.vue'
 import MailDetailDrawer from '../components/MailDetailDrawer.vue'
+import WelcomePanel from '../components/WelcomePanel.vue'
 import ComposeDialog from '../components/ComposeDialog.vue'
 import SettingsDialog from '../components/SettingsDialog.vue'
 import { useMailStore } from '../stores/mailStore'
@@ -110,7 +111,25 @@ const handleComposeBtnClick = () => {
         @settings-click="showSettings = true"
       />
 
-      <MailList @select-mail="handleSelectMail" />
+      <!-- 中间面板：目录 ⇄ 邮件内容 -->
+      <div class="middle-panel">
+        <MailList
+          v-if="!selectedMailId"
+          @select-mail="handleSelectMail"
+        />
+        <MailDetailDrawer
+          v-else
+          :mail-id="selectedMailId"
+          inline
+          show-back
+          @close="selectedMailId = null"
+        />
+      </div>
+
+      <!-- 右侧面板：欢迎页（以后接 AI 对话） -->
+      <aside class="right-panel">
+        <WelcomePanel @compose-click="handleComposeBtnClick" />
+      </aside>
     </div>
 
     <ComposeDialog v-model="showCompose" />
@@ -121,7 +140,6 @@ const handleComposeBtnClick = () => {
       :syncing="syncing"
       @sync-now="pollMailbox(true)"
     />
-    <MailDetailDrawer :mail-id="selectedMailId" @close="selectedMailId = null" />
   </div>
 </template>
 
@@ -130,7 +148,7 @@ const handleComposeBtnClick = () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f9fafb;
+  background: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
@@ -139,5 +157,21 @@ const handleComposeBtnClick = () => {
   flex: 1;
   overflow: hidden;
   gap: 0;
+}
+
+.middle-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.right-panel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid #e0e0e0;
+  background: #fbfbfa;
+  overflow-y: auto;
 }
 </style>

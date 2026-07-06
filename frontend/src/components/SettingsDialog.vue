@@ -71,13 +71,14 @@ const updateInterval = (event: Event) => {
 </template>
 
 <style scoped>
-.settings-section { padding: 4px 0 18px; }
-.settings-section + .settings-section { border-top: 1px solid #e5e7eb; padding-top: 18px; }
-.settings-section h3 { margin: 0 0 14px; font-size: 15px; color: #111827; }
-.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 11px 0; color: #4b5563; }
-.setting-row strong { color: #111827; font-weight: 500; overflow-wrap: anywhere; }
-.setting-row select { padding: 7px 28px 7px 10px; border: 1px solid #d1d5db; border-radius: 7px; background: #fff; }
-.sync-button, .close-button { border: 0; border-radius: 7px; padding: 8px 15px; color: #fff; background: #4f46e5; cursor: pointer; }
-.sync-button:disabled { opacity: .55; cursor: default; }
-.close-button { min-width: 76px; }
+.settings-section { padding: 8px 0 20px; }
+.settings-section + .settings-section { border-top: 1px solid #e0e0e0; padding-top: 20px; }
+.settings-section h3 { margin: 0 0 16px; font-size: 14px; font-weight: 500; color: #37352f; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 12px 0; color: rgba(55, 53, 47, 0.55); font-size: 13px; }
+.setting-row strong { color: #37352f; font-weight: 500; overflow-wrap: anywhere; font-size: 13px; }
+.setting-row select { padding: 6px 28px 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; font-size: 13px; color: #37352f; cursor: pointer; }
+.sync-button, .close-button { border: 0; border-radius: 4px; padding: 8px 16px; color: #fff; background: #37352f; cursor: pointer; font-size: 13px; transition: background 0.15s; }
+.sync-button:hover:not(:disabled), .close-button:hover { background: #2b2925; }
+.sync-button:disabled { opacity: .45; cursor: default; }
+.close-button { min-width: 72px; }
 </style>

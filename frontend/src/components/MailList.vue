@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
 import { ElMessage } from 'element-plus'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 const mailStore = useMailStore()
-const selectedMailId = ref<string | null>(null)
 
 const emit = defineEmits<{
   selectMail: [mailId: string]
 }>()
 
 const handleSelectMail = async (mailId: string) => {
-  selectedMailId.value = mailId
   try {
     await mailStore.markAsRead(mailId)
   } catch (error) {
@@ -88,7 +86,6 @@ const formatTime = (timestamp: number) => {
         :key="item.id"
         class="mail-row"
         :class="{
-          selected: selectedMailId === item.id,
           unread: !item.read
         }"
         @click="handleSelectMail(item.id)"
@@ -139,7 +136,7 @@ const formatTime = (timestamp: number) => {
   flex-direction: column;
   height: 100%;
   flex: 1;
-  background: white;
+  background: #fff;
   min-width: 0;
 }
 
@@ -147,9 +144,9 @@ const formatTime = (timestamp: number) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fafbfc;
+  padding: 10px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
 }
 
 .header-left {
@@ -158,35 +155,66 @@ const formatTime = (timestamp: number) => {
   gap: 8px;
 }
 
-.header-right { display: flex; align-items: center; gap: 6px; }
-.header-right button { border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
-.header-right button:disabled { opacity: .4; cursor: default; }
+.header-right { display: flex; align-items: center; gap: 4px; }
+.header-right button {
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: rgba(55, 53, 47, 0.45);
+  padding: 4px 8px;
+  font-size: 14px;
+  transition: background 0.1s;
+}
+.header-right button:hover:not(:disabled) { background: #f4f4f4; }
+.header-right button:disabled { opacity: .3; cursor: default; }
+
+.pagination {
+  font-size: 12px;
+  color: rgba(55, 53, 47, 0.5);
+  margin-right: 4px;
+}
 
 .checkbox {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
+  accent-color: #37352f;
 }
 
 .refresh-btn {
   border: 0;
   background: transparent;
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
-  transition: transform 0.2s;
+  color: rgba(55, 53, 47, 0.5);
+  transition: transform 0.2s, color 0.1s;
+  padding: 4px;
+  border-radius: 4px;
 }
 
-.loading-state, .error-state { padding: 18px; text-align: center; color: #6b7280; }
-.error-state { color: #b91c1c; background: #fef2f2; }
-.error-state button { margin-left: 10px; }
-
 .refresh-btn:hover {
+  color: #37352f;
+  background: #f4f4f4;
   transform: rotate(180deg);
 }
 
+.refresh-btn:disabled {
+  cursor: default;
+  opacity: .3;
+}
+
+.refresh-btn:disabled:hover {
+  transform: none;
+  background: transparent;
+}
+
+.loading-state, .error-state { padding: 24px; text-align: center; color: rgba(55, 53, 47, 0.5); font-size: 13px; }
+.error-state { color: #e03e3e; background: #fef2f2; border-radius: 4px; margin: 8px; }
+.error-state button { margin-left: 10px; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 12px; cursor: pointer; background: #fff; }
+
 .header-right {
   font-size: 12px;
-  color: #6b7280;
 }
 
 .list-container {
@@ -199,47 +227,46 @@ const formatTime = (timestamp: number) => {
 .mail-row {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f3f4f6;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f0efed;
   cursor: pointer;
-  transition: all 0.2s;
-  gap: 12px;
+  transition: background 0.1s;
+  gap: 14px;
 }
 
 .mail-row:hover {
-  background: #f9fafb;
-  box-shadow: inset 1px 0 0 #e5e7eb;
+  background: #fbfbfa;
 }
 
 .mail-row.selected {
-  background: #e0e7ff;
+  background: #f4f4f4;
 }
 
 .mail-row.unread {
-  background: #f3f7ff;
+  background: #fcfcfa;
 }
 
 .mail-row.unread .sender-name,
 .mail-row.unread .subject-text {
   font-weight: 600;
-  color: #1f2937;
+  color: #37352f;
 }
 
 .row-checkbox {
-  flex: 0 0 24px;
+  flex: 0 0 20px;
 }
 
 .row-star {
-  flex: 0 0 24px;
+  flex: 0 0 22px;
 }
 
 .star-btn {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
-  opacity: 0.3;
-  transition: all 0.2s;
+  font-size: 15px;
+  opacity: 0.25;
+  transition: opacity 0.15s, transform 0.15s;
   padding: 0;
   display: flex;
   align-items: center;
@@ -247,7 +274,8 @@ const formatTime = (timestamp: number) => {
 }
 
 .star-btn:hover {
-  opacity: 0.6;
+  opacity: 0.55;
+  transform: scale(1.1);
 }
 
 .star-btn.starred {
@@ -255,13 +283,13 @@ const formatTime = (timestamp: number) => {
 }
 
 .row-sender {
-  flex: 0 0 120px;
+  flex: 0 0 130px;
   min-width: 100px;
 }
 
 .sender-name {
-  font-size: 14px;
-  color: #374151;
+  font-size: 13px;
+  color: #37352f;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -277,8 +305,8 @@ const formatTime = (timestamp: number) => {
 }
 
 .subject-text {
-  font-size: 14px;
-  color: #374151;
+  font-size: 13px;
+  color: #37352f;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -287,6 +315,7 @@ const formatTime = (timestamp: number) => {
 .attachment-icon {
   font-size: 12px;
   flex-shrink: 0;
+  opacity: 0.5;
 }
 
 .row-preview {
@@ -295,8 +324,8 @@ const formatTime = (timestamp: number) => {
 }
 
 .preview-text {
-  font-size: 13px;
-  color: #9ca3af;
+  font-size: 12px;
+  color: rgba(55, 53, 47, 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -309,8 +338,8 @@ const formatTime = (timestamp: number) => {
 }
 
 .time-text {
-  font-size: 12px;
-  color: #9ca3af;
+  font-size: 11px;
+  color: rgba(55, 53, 47, 0.45);
 }
 
 .empty-state {
@@ -320,7 +349,7 @@ const formatTime = (timestamp: number) => {
   justify-content: center;
   height: 100%;
   gap: 16px;
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.35);
 }
 
 .empty-icon {
@@ -329,6 +358,6 @@ const formatTime = (timestamp: number) => {
 
 .empty-state p {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 </style>

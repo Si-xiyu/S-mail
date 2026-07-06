@@ -370,50 +370,49 @@ const handleAddToLabel = async (labelId: string) => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: white;
+  background: #fff;
   overflow: hidden;
 }
 
 .detail-top-bar {
-  padding: 12px 24px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fafbfc;
+  padding: 0 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 64px;
+  height: 52px;
   flex-shrink: 0;
 }
 
 .back-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  color: #374151;
-  font-size: 14px;
+  color: #37352f;
+  font-size: 13px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.1s;
 }
 
 .back-btn:hover {
-  background: #f9fafb;
-  color: #1f2937;
+  background: #f4f4f4;
 }
 
 .detail-content {
-  height: calc(100% - 64px);
+  height: calc(100% - 52px);
   width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px;
+  padding: 28px 36px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .empty-state {
@@ -423,7 +422,7 @@ const handleAddToLabel = async (labelId: string) => {
   justify-content: center;
   height: 100%;
   gap: 16px;
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.4);
 }
 
 .empty-icon {
@@ -432,7 +431,7 @@ const handleAddToLabel = async (labelId: string) => {
 
 .empty-state p {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .detail-header {
@@ -440,7 +439,7 @@ const handleAddToLabel = async (labelId: string) => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 16px;
 }
 
@@ -450,10 +449,10 @@ const handleAddToLabel = async (labelId: string) => {
 
 .subject {
   margin: 0 0 16px;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
-  color: #1f2937;
-  line-height: 1.3;
+  color: #37352f;
+  line-height: 1.4;
 }
 
 .sender-info {
@@ -463,16 +462,16 @@ const handleAddToLabel = async (labelId: string) => {
 }
 
 .sender-avatar {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #e0e7ff;
-  color: #667eea;
+  background: #f0efed;
+  color: #37352f;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -482,24 +481,24 @@ const handleAddToLabel = async (labelId: string) => {
 
 .sender-name {
   font-weight: 500;
-  color: #1f2937;
-  font-size: 14px;
+  color: #37352f;
+  font-size: 13px;
 }
 
 .sender-email {
   font-size: 12px;
-  color: #6b7280;
+  color: rgba(55, 53, 47, 0.5);
 }
 
 .mail-date {
   font-size: 12px;
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.45);
   white-space: nowrap;
 }
 
 .detail-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
   position: relative;
 }
@@ -512,21 +511,21 @@ const handleAddToLabel = async (labelId: string) => {
   position: fixed;
   top: 0;
   left: 240px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .06);
   z-index: 1000;
   min-width: 160px;
   overflow: hidden;
 }
 
 .label-menu-title {
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 10px 14px;
+  font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
-  border-bottom: 1px solid #e5e7eb;
+  color: rgba(55, 53, 47, 0.45);
+  border-bottom: 1px solid #e0e0e0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -534,66 +533,52 @@ const handleAddToLabel = async (labelId: string) => {
 .label-menu-item {
   display: block;
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 14px;
   text-align: left;
   background: none;
   border: none;
   cursor: pointer;
-  color: #374151;
+  color: #37352f;
   font-size: 13px;
-  transition: background 0.2s;
+  transition: background 0.1s;
 }
 
 .label-menu-item:hover {
-  background: #f3f4f6;
+  background: #f4f4f4;
 }
 
 .label-menu-empty {
-  padding: 12px;
+  padding: 12px 14px;
   text-align: center;
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.5);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .action-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: white;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  transition: all 0.2s;
+  font-size: 16px;
+  transition: background 0.1s;
 }
 
 .action-btn:hover {
-  background: #f9fafb;
+  background: #f4f4f4;
 }
 
 .action-btn.restore {
-  border-color: #10b981;
-  color: #10b981;
-}
-
-.action-btn.restore:hover {
-  background: #f0fdf4;
-  border-color: #059669;
-  color: #059669;
+  color: #37352f;
 }
 
 .action-btn.delete-permanent {
-  border-color: #ef4444;
-  color: #ef4444;
-}
-
-.action-btn.delete-permanent:hover {
-  background: #fef2f2;
-  border-color: #dc2626;
-  color: #dc2626;
+  color: #e03e3e;
 }
 
 .action-btn span.starred {
@@ -602,7 +587,7 @@ const handleAddToLabel = async (labelId: string) => {
 
 .recipients {
   font-size: 13px;
-  color: #6b7280;
+  color: rgba(55, 53, 47, 0.5);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -630,28 +615,28 @@ const handleAddToLabel = async (labelId: string) => {
 .content-text {
   margin: 0;
   font-size: 14px;
-  line-height: 1.6;
-  color: #374151;
+  line-height: 1.75;
+  color: #37352f;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .attachments {
-  border-top: 1px solid #e5e7eb;
-  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 20px;
 }
 
 .attachments h3 {
   margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(55, 53, 47, 0.55);
 }
 
 .attachment-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .attachment-item {
@@ -659,10 +644,10 @@ const handleAddToLabel = async (labelId: string) => {
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f9fafb;
-  color: #667eea;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+  color: #37352f;
 }
 
 .attachment-info {
@@ -672,80 +657,80 @@ const handleAddToLabel = async (labelId: string) => {
 .attachment-name {
   font-size: 13px;
   font-weight: 500;
-  color: #1f2937;
+  color: #37352f;
 }
 
 .attachment-size {
   font-size: 12px;
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.45);
 }
 
 .download-btn {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
-  transition: all 0.2s;
+  opacity: .6;
+  transition: opacity 0.15s;
 }
 
 .download-btn:hover {
-  transform: scale(1.2);
+  opacity: 1;
 }
 
 .reply-actions {
   display: flex;
   gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
   flex-wrap: wrap;
 }
 
 .reply-btn {
-  padding: 8px 16px;
-  background: #e0e7ff;
-  color: #667eea;
-  border: none;
-  border-radius: 8px;
+  padding: 8px 18px;
+  background: #fff;
+  color: #37352f;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.1s;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .reply-btn:hover {
-  background: #c7d2fe;
+  background: #f4f4f4;
 }
 
 .more-actions {
   display: flex;
   gap: 16px;
   padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e0e0e0;
 }
 
 .text-btn {
   background: none;
   border: none;
-  color: #667eea;
+  color: #37352f;
   cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-weight: 400;
+  transition: opacity 0.1s;
 }
 
 .text-btn:hover {
-  color: #764ba2;
-  text-decoration: underline;
+  opacity: .7;
 }
 
 .reply-panel {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f9fafb;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fbfbfa;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -757,44 +742,46 @@ const handleAddToLabel = async (labelId: string) => {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .reply-label {
   font-size: 13px;
-  color: #6b7280;
+  color: rgba(55, 53, 47, 0.55);
   font-weight: 500;
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: #6b7280;
+  color: rgba(55, 53, 47, 0.5);
   cursor: pointer;
-  font-size: 16px;
-  transition: color 0.2s;
+  font-size: 14px;
+  transition: color 0.1s;
+  padding: 2px 4px;
+  border-radius: 3px;
 }
 
 .close-btn:hover {
-  color: #1f2937;
+  color: #37352f;
+  background: #f4f4f4;
 }
 
 .reply-textarea {
   padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   font-family: inherit;
-  font-size: 14px;
-  color: #1f2937;
+  font-size: 13px;
+  color: #37352f;
   outline: none;
   resize: vertical;
   min-height: 120px;
-  background: white;
+  background: #fff;
 }
 
 .reply-textarea:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 4px rgba(102, 126, 234, 0.2);
+  border-color: #b0b0b0;
 }
 
 .reply-footer {
@@ -804,51 +791,48 @@ const handleAddToLabel = async (labelId: string) => {
 }
 
 .send-btn {
-  padding: 8px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  padding: 8px 22px;
+  background: #37352f;
+  color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.15s;
 }
 
 .send-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  background: #2b2925;
 }
 
 .cancel-btn {
   padding: 8px 16px;
-  background: white;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  background: #fff;
+  color: #37352f;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.1s;
 }
 
 .cancel-btn:hover {
-  background: #f3f4f6;
-  color: #1f2937;
+  background: #f4f4f4;
 }
 
 .thread-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
 .thread-message {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   overflow: hidden;
-  background: white;
+  background: #fff;
 }
 
 .thread-message-header {
@@ -856,27 +840,27 @@ const handleAddToLabel = async (labelId: string) => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: #fbfbfa;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .thread-message-sender {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .sender-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: #e0e7ff;
-  color: #667eea;
+  background: #f0efed;
+  color: #37352f;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -887,38 +871,38 @@ const handleAddToLabel = async (labelId: string) => {
 
 .sender-name {
   font-weight: 500;
-  color: #1f2937;
-  font-size: 14px;
+  color: #37352f;
+  font-size: 13px;
 }
 
 .sender-email {
-  font-size: 12px;
-  color: #6b7280;
+  font-size: 11px;
+  color: rgba(55, 53, 47, 0.5);
 }
 
 .message-time {
-  font-size: 12px;
-  color: #9ca3af;
+  font-size: 11px;
+  color: rgba(55, 53, 47, 0.45);
   white-space: nowrap;
 }
 
 .thread-message-subject {
-  padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .thread-message-subject h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: #37352f;
 }
 
 .thread-message-body {
   padding: 16px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #374151;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #37352f;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -928,22 +912,11 @@ const handleAddToLabel = async (labelId: string) => {
   flex-direction: column;
   gap: 16px;
   padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e0e0e0;
 }
 
 .action-buttons-group {
   width: 100%;
-}
-
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-}
-
-.detail-title {
-  flex: 1;
 }
 
 .loading-state {
@@ -953,7 +926,8 @@ const handleAddToLabel = async (labelId: string) => {
   justify-content: center;
   height: 100%;
   gap: 16px;
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.4);
+  font-size: 13px;
 }
 
 .loading-spinner {
@@ -962,11 +936,7 @@ const handleAddToLabel = async (labelId: string) => {
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -116,10 +116,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 64px;
+  padding: 0 20px;
+  height: 52px;
   background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   gap: 16px;
 }
 
@@ -131,27 +131,42 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: #37352f;
+}
+
+.logo svg {
+  color: rgba(55, 53, 47, 0.55);
 }
 
 .topbar-center {
   flex: 1;
   display: flex;
   justify-content: center;
-  max-width: 400px;
+  max-width: 480px;
 }
 
 .search-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 24px;
-  background: #f9fafb;
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fbfbfa;
   width: 100%;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.search-box:focus-within {
+  border-color: #b0b0b0;
+  background: #fff;
+}
+
+.search-box svg {
+  color: rgba(55, 53, 47, 0.35);
+  flex-shrink: 0;
 }
 
 .search-box input {
@@ -159,38 +174,39 @@ onUnmounted(() => {
   border: none;
   background: transparent;
   outline: none;
-  font-size: 14px;
+  font-size: 13px;
+  color: #37352f;
 }
 
 .search-box input::placeholder {
-  color: #9ca3af;
+  color: rgba(55, 53, 47, 0.35);
 }
 
-.clear-search { border: 0; color: #6b7280; background: transparent; cursor: pointer; }
+.clear-search { border: 0; color: rgba(55, 53, 47, 0.45); background: transparent; cursor: pointer; font-size: 14px; }
 
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .icon-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #6b7280;
-  border-radius: 50%;
-  transition: all 0.2s;
+  color: rgba(55, 53, 47, 0.5);
+  border-radius: 4px;
+  transition: background 0.1s;
 }
 
 .icon-button:hover {
-  background: #f3f4f6;
-  color: #1f2937;
+  background: #f4f4f4;
+  color: #37352f;
 }
 
 .user-menu {
@@ -198,31 +214,29 @@ onUnmounted(() => {
 }
 
 .avatar-button {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: none;
   cursor: pointer;
   overflow: hidden;
   padding: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #37352f;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s;
+  color: #fff;
+  font-weight: 500;
+  font-size: 13px;
+  transition: opacity 0.15s;
 }
 
 .avatar-button:hover {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+  opacity: 0.85;
 }
 
 .avatar-button.active {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+  opacity: 0.85;
 }
 
 .avatar-button img {
@@ -241,70 +255,71 @@ onUnmounted(() => {
   position: absolute;
   top: 100%;
   right: 0;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   min-width: 200px;
   z-index: 1000;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .user-info {
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .user-info strong {
-  color: #1f2937;
-  font-size: 14px;
+  color: #37352f;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .user-info span {
-  color: #6b7280;
+  color: rgba(55, 53, 47, 0.5);
   font-size: 12px;
 }
 
 .user-dropdown button {
   display: block;
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border: none;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  color: #1f2937;
-  font-size: 14px;
-  transition: all 0.2s;
+  color: #37352f;
+  font-size: 13px;
+  transition: background 0.1s;
 }
 
 .user-dropdown button:hover {
-  background: #f3f4f6;
+  background: #f4f4f4;
 }
 
 .logout-button {
-  color: #ef4444 !important;
+  color: #e03e3e !important;
 }
 
 .logout-button:hover {
-  background: #fee2e2 !important;
+  background: #fef2f2 !important;
 }
 
 .dropdown-enter-active,
 .dropdown-leave-active {
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .dropdown-enter-from {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-4px);
 }
 
 .dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-4px);
 }
 </style>
