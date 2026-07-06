@@ -6,6 +6,11 @@ const mailStore = useMailStore()
 const showAddTagInput = ref(false)
 const newTagName = ref('')
 const hoveredLabelId = ref<string | null>(null)
+const emit = defineEmits<{
+  composeClick: []
+  draftClick: []
+  settingsClick: []
+}>()
 
 // 系统自带标签的 ID 列表
 const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
@@ -28,12 +33,12 @@ const isActive = (labelId: string) => {
 }
 
 const selectLabel = (labelId: string) => {
+  if (labelId === 'DRAFTS') {
+    emit('draftClick')
+    return
+  }
   mailStore.selectLabel(labelId)
 }
-
-const emit = defineEmits<{
-  composeClick: []
-}>()
 
 const handleComposeClick = () => {
   emit('composeClick')
@@ -46,7 +51,8 @@ const getLabelIcon = (labelId: string) => {
     SENT: '📤',
     DRAFTS: '✏️',
     TRASH: '🗑️',
-    SPAM: '🚫'
+    SPAM: '🚫',
+    JUNK: '🚫'
   }
   return icons[labelId] || '📁'
 }
@@ -162,7 +168,7 @@ const handleDeleteLabel = async (labelId: string) => {
         <span>Add Tag</span>
       </button>
       <div class="footer-buttons">
-        <button class="settings-btn">
+        <button class="settings-btn" title="Settings" @click="emit('settingsClick')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
             <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" />

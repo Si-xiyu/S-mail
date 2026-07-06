@@ -109,6 +109,15 @@ export interface MailSendResponse {
   }
 }
 
+// ============ Mail synchronization ============
+/** 对应后端 NotificationPollResponse。 */
+export interface NotificationPollResponse {
+  unreadCount: number
+  newMailCount: number
+  inboxCount: number
+  junkCount: number
+}
+
 // ============ AI Agent ============
 export interface AgentTaskResponse {
   task: string

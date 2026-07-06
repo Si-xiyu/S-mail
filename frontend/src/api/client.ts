@@ -4,6 +4,7 @@ import type {
   MailDetail,
   MailboxItem,
   MailSendResponse,
+  NotificationPollResponse,
   PendingAttachment,
   SendMailPayload,
   ThreadMessage,
@@ -312,6 +313,16 @@ export async function downloadAttachment(attachmentId: number, fileName: string)
   link.download = fileName
   link.click()
   URL.revokeObjectURL(url)
+}
+
+export async function pollNotifications(since?: string): Promise<NotificationPollResponse> {
+  const { data } = await http.get<ApiResponse<NotificationPollResponse>>('/notifications/poll', {
+    params: { since }
+  })
+  if (data.code !== 0) {
+    throw new Error(data.message || '同步邮箱失败')
+  }
+  return data.data
 }
 
 // ============ 分类 API ============

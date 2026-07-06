@@ -18,6 +18,7 @@ let saveTimer: number | undefined
 
 const draftKey = () => `smartmail_draft_${mailStore.user?.id || 'anonymous'}`
 const addresses = (value: string) => value.split(',').map(item => item.trim()).filter(Boolean)
+const notifyDraftChanged = () => window.dispatchEvent(new CustomEvent('smartmail:draft-changed'))
 
 const saveDraft = () => {
   window.clearTimeout(saveTimer)
@@ -28,6 +29,7 @@ const saveDraft = () => {
     } else {
       localStorage.removeItem(draftKey())
     }
+    notifyDraftChanged()
   }, 250)
 }
 
@@ -44,6 +46,7 @@ const restoreDraft = () => {
     attachments.value = Array.isArray(draft.attachments) ? draft.attachments : []
   } catch {
     localStorage.removeItem(draftKey())
+    notifyDraftChanged()
   }
 }
 
@@ -83,6 +86,7 @@ const clearDraft = () => {
   Object.assign(form, { to: '', cc: '', bcc: '', subject: '', content: '' })
   attachments.value = []
   localStorage.removeItem(draftKey())
+  notifyDraftChanged()
 }
 
 const handleSend = async () => {

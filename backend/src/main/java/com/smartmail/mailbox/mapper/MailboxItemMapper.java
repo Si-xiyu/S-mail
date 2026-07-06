@@ -46,6 +46,7 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
             WHERE user_id = #{userId}
               AND deleted_flag = FALSE
               AND read_flag = FALSE
+              AND folder IN ('INBOX', 'JUNK')
             """)
     long countUnread(Long userId);
 
@@ -200,6 +201,7 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
             SELECT COUNT(*) FROM mailbox_item
             WHERE user_id = #{userId}
               AND deleted_flag = FALSE
+              AND folder IN ('INBOX', 'JUNK')
               AND received_at > #{since}
             """)
     long countSince(Long userId, LocalDateTime since);

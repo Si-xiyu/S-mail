@@ -1,7 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Mail, MailItem, User, Label } from '../types'
-import type { MailboxItem, MailDetail, MailSendResponse, SendMailPayload, ThreadMessage, UserProfile } from '../types/mail'
+import type {
+  MailboxItem,
+  MailDetail,
+  MailSendResponse,
+  NotificationPollResponse,
+  SendMailPayload,
+  ThreadMessage,
+  UserProfile
+} from '../types/mail'
 import * as apiClient from '../api/client'
 
 export const useMailStore = defineStore('mail', () => {
@@ -39,6 +47,7 @@ export const useMailStore = defineStore('mail', () => {
   const page = ref(1)
   const pageSize = ref(20)
   const searchQuery = ref('')
+  const unreadCount = ref(0)
 
   // ============ 计算属性 ============
 
@@ -344,6 +353,35 @@ export const useMailStore = defineStore('mail', () => {
       await loadStarredMails()
     } else {
       await loadMailbox(currentLabel.value, page.value, pageSize.value)
+    }
+  }
+
+  const applyNotificationCounts = (notification: NotificationPollResponse): void => {
+    unreadCount.value = notification.unreadCount
+    const inbox = labels.value.find(label => label.id === 'INBOX')
+    const junk = labels.value.find(label => label.id === 'JUNK')
+    if (inbox) inbox.count = notification.inboxCount
+    if (junk) junk.count = notification.junkCount
+  }
+
+  const refreshDraftCount = (): void => {
+    const draft = labels.value.find(label => label.id === 'DRAFTS')
+    if (!draft) return
+    const key = `smartmail_draft_${user.value?.id || 'anonymous'}`
+    const raw = localStorage.getItem(key)
+    if (!raw) {
+      draft.count = 0
+      return
+    }
+    try {
+      const value = JSON.parse(raw) as Record<string, unknown>
+      const hasText = ['to', 'cc', 'bcc', 'subject', 'content']
+        .some(field => typeof value[field] === 'string' && value[field].trim().length > 0)
+      const hasAttachments = Array.isArray(value.attachments) && value.attachments.length > 0
+      draft.count = hasText || hasAttachments ? 1 : 0
+    } catch {
+      localStorage.removeItem(key)
+      draft.count = 0
     }
   }
 
@@ -692,6 +730,7 @@ export const useMailStore = defineStore('mail', () => {
     page,
     pageSize,
     searchQuery,
+    unreadCount,
 
     // 计算属性
     currentMailItems,
@@ -711,6 +750,8 @@ export const useMailStore = defineStore('mail', () => {
     sendMessage,
     searchMailbox,
     refreshCurrent,
+    applyNotificationCounts,
+    refreshDraftCount,
     markMailRead,
     starMail,
     deleteMail: deleteMailCompat,
