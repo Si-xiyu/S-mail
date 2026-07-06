@@ -62,11 +62,13 @@ public class MailboxController {
     @GetMapping("/search")
     public ApiResponse<PageResponse<SearchResultResponse>> search(
             @RequestParam String keyword,
-            @RequestParam(defaultValue = "INBOX") String folder,
+            @RequestParam(required = false) String folder,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Boolean starred,
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long pageSize
     ) {
-        return ApiResponse.ok(searchService.search(keyword, folder, page, pageSize));
+        return ApiResponse.ok(searchService.search(keyword, folder, categoryId, starred, page, pageSize));
     }
 
     @PatchMapping("/items/{itemId}/category")

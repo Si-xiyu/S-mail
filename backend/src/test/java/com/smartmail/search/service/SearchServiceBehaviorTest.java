@@ -32,12 +32,12 @@ class SearchServiceBehaviorTest {
 
     @Test
     void searchNormalizesFolderAndPaginationLikeMailboxList() {
-        when(mailboxItemMapper.searchByKeyword(1L, "%project%", "INBOX", 50L, 0L)).thenReturn(List.of());
-        when(mailboxItemMapper.countByKeyword(1L, "%project%", "INBOX")).thenReturn(0L);
+        when(mailboxItemMapper.searchByKeyword(1L, "%project%", "INBOX", 7L, true, 50L, 0L)).thenReturn(List.of());
+        when(mailboxItemMapper.countByKeyword(1L, "%project%", "INBOX", 7L, true)).thenReturn(0L);
 
-        searchService.search("project", "inbox", 0, 500);
+        searchService.search("project", "inbox", 7L, true, 0, 500);
 
-        verify(mailboxItemMapper).searchByKeyword(1L, "%project%", "INBOX", 50L, 0L);
-        verify(mailboxItemMapper).countByKeyword(1L, "%project%", "INBOX");
+        verify(mailboxItemMapper).searchByKeyword(1L, "%project%", "INBOX", 7L, true, 50L, 0L);
+        verify(mailboxItemMapper).countByKeyword(1L, "%project%", "INBOX", 7L, true);
     }
 }

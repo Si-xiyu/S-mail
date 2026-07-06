@@ -1,4 +1,5 @@
--- Drop existing tables to ensure clean schema
+-- Development schema for the in-memory H2 profile. Persistent MySQL deployments
+-- must manage schema changes separately and keep spring.sql.init.mode=never.
 DROP TABLE IF EXISTS ai_analysis_task;
 DROP TABLE IF EXISTS mail_ai_result;
 DROP TABLE IF EXISTS mail_category_assignment;
@@ -150,7 +151,7 @@ CREATE INDEX idx_category_user ON mail_category(user_id);
 CREATE INDEX idx_category_user_name ON mail_category(user_id, name);
 CREATE INDEX idx_assignment_user_mail ON mail_category_assignment(user_id, mail_id);
 CREATE INDEX idx_assignment_category ON mail_category_assignment(category_id);
-CREATE UNIQUE INDEX idx_assignment_unique ON mail_category_assignment(user_id, mail_id);
+CREATE UNIQUE INDEX idx_assignment_unique ON mail_category_assignment(user_id, mail_id, category_id);
 CREATE INDEX idx_analysis_task_pending ON ai_analysis_task(status, created_at);
 CREATE INDEX idx_analysis_task_item ON ai_analysis_task(item_id, user_id, status);
 CREATE INDEX idx_analysis_task_mail_user ON ai_analysis_task(mail_id, user_id);

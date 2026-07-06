@@ -82,8 +82,14 @@ public class CategoryService {
         MailCategory other = findDefaultCategory(userId, DEFAULT_OTHER);
         List<MailCategoryAssignment> assignments = assignmentMapper.listByCategory(categoryId, userId);
         for (MailCategoryAssignment a : assignments) {
-            a.setCategoryId(other.getId());
-            assignmentMapper.updateById(a);
+            MailCategoryAssignment existingOther =
+                    assignmentMapper.findByMailAndUserAndCategory(a.getMailId(), userId, other.getId());
+            if (existingOther == null) {
+                a.setCategoryId(other.getId());
+                assignmentMapper.updateById(a);
+            } else {
+                assignmentMapper.deleteById(a.getId());
+            }
         }
         categoryMapper.deleteById(categoryId);
     }
@@ -149,6 +155,14 @@ public class CategoryService {
 
     public List<Long> getMailIdsByCategory(Long categoryId, Long userId) {
         return assignmentMapper.listMailIdsByCategory(categoryId, userId);
+    }
+
+    public void removeCategoryForUser(Long mailId, Long userId, Long categoryId) {
+        MailCategoryAssignment assignment =
+                assignmentMapper.findByMailAndUserAndCategory(mailId, userId, categoryId);
+        if (assignment != null) {
+            assignmentMapper.deleteById(assignment.getId());
+        }
     }
 
     public MailCategory getCategoryForMail(Long mailId, Long userId) {

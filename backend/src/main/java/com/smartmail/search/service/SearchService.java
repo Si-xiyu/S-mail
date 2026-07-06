@@ -20,7 +20,8 @@ public class SearchService {
         this.mailboxItemMapper = mailboxItemMapper;
     }
 
-    public PageResponse<SearchResultResponse> search(String keyword, String folder, long page, long pageSize) {
+    public PageResponse<SearchResultResponse> search(
+            String keyword, String folder, Long categoryId, Boolean starred, long page, long pageSize) {
         Long userId = UserContext.requireUserId();
         String likeKeyword = "%" + (keyword == null ? "" : keyword.trim()) + "%";
         String normalizedFolder = normalizeFolder(folder);
@@ -29,9 +30,9 @@ public class SearchService {
         long offset = (safePage - 1) * safeSize;
 
         List<Map<String, Object>> rows = mailboxItemMapper.searchByKeyword(
-                userId, likeKeyword, normalizedFolder, safeSize, offset);
+                userId, likeKeyword, normalizedFolder, categoryId, starred, safeSize, offset);
         long total = mailboxItemMapper.countByKeyword(userId, likeKeyword,
-                normalizedFolder);
+                normalizedFolder, categoryId, starred);
 
         List<SearchResultResponse> records = new ArrayList<>();
         for (Map<String, Object> row : rows) {

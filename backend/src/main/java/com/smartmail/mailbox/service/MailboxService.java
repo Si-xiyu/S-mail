@@ -17,7 +17,7 @@ import java.util.Set;
 
 @Service
 public class MailboxService {
-    private static final Set<String> MOVABLE_FOLDERS = Set.of("INBOX", "JUNK", "TRASH", "SENT");
+    private static final Set<String> MOVABLE_FOLDERS = Set.of("INBOX", "JUNK");
 
     private final MailboxItemMapper mailboxMapper;
     private final MailMessageMapper mailMapper;
@@ -100,12 +100,14 @@ public class MailboxService {
                 item.setFolder("INBOX");
             }
         } else {
-            // 普通移动操作
+            if ("TRASH".equals(item.getFolder())) {
+                throw new BusinessException(400, "Trash items must be restored explicitly");
+            }
+            if ("SENT".equals(item.getFolder())) {
+                throw new BusinessException(400, "Sent items cannot be moved to inbox or junk");
+            }
             if (!MOVABLE_FOLDERS.contains(targetFolder)) {
                 throw new BusinessException(400, "Unsupported mailbox folder");
-            }
-            if ("SENT".equals(targetFolder) && !"SENT".equals(item.getFolder())) {
-                throw new BusinessException(400, "Only sent items can be restored to Sent");
             }
 
             // 移动到目标 folder，并清除 originalFolder
@@ -123,9 +125,9 @@ public class MailboxService {
         if ("JUNK".equals(item.getFolder()) && junkCat != null) {
             categoryService.assignCategory(item.getMailId(), junkCat.getId(), "MANUAL");
         } else if ("INBOX".equals(item.getFolder()) && junkCat != null) {
-            com.smartmail.category.entity.MailCategory currentCat =
-                    categoryService.getCategoryForMail(item.getMailId(), UserContext.requireUserId());
-            if (currentCat != null && CategoryService.DEFAULT_JUNK.equals(currentCat.getName()) && otherCat != null) {
+            Long userId = UserContext.requireUserId();
+            categoryService.removeCategoryForUser(item.getMailId(), userId, junkCat.getId());
+            if (categoryService.getCategoryForMail(item.getMailId(), userId) == null && otherCat != null) {
                 categoryService.assignCategory(item.getMailId(), otherCat.getId(), "MANUAL");
             }
         }

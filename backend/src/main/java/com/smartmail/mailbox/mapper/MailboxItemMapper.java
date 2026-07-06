@@ -66,9 +66,28 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
               AND mi.deleted_flag = FALSE
               AND (mm.subject LIKE #{keyword}
                    OR mm.sender_email LIKE #{keyword}
-                   OR mm.content_text LIKE #{keyword})
+                   OR mm.content_text LIKE #{keyword}
+                   OR EXISTS (
+                       SELECT 1
+                       FROM mail_category_assignment mca
+                       JOIN mail_category mc ON mc.id = mca.category_id
+                       WHERE mca.user_id = mi.user_id
+                         AND mca.mail_id = mi.mail_id
+                         AND mc.name LIKE #{keyword}
+                   ))
               <if test="folder != null">
               AND mi.folder = #{folder}
+              </if>
+              <if test="categoryId != null">
+              AND EXISTS (
+                  SELECT 1 FROM mail_category_assignment mca
+                  WHERE mca.user_id = mi.user_id
+                    AND mca.mail_id = mi.mail_id
+                    AND mca.category_id = #{categoryId}
+              )
+              </if>
+              <if test="starred != null and starred">
+              AND mi.star_flag = TRUE
               </if>
             ORDER BY mi.received_at DESC
             LIMIT #{limit} OFFSET #{offset}
@@ -77,6 +96,8 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
     List<Map<String, Object>> searchByKeyword(@Param("userId") Long userId,
                                               @Param("keyword") String keyword,
                                               @Param("folder") String folder,
+                                              @Param("categoryId") Long categoryId,
+                                              @Param("starred") Boolean starred,
                                               @Param("limit") long limit,
                                               @Param("offset") long offset);
 
@@ -89,15 +110,36 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
               AND mi.deleted_flag = FALSE
               AND (mm.subject LIKE #{keyword}
                    OR mm.sender_email LIKE #{keyword}
-                   OR mm.content_text LIKE #{keyword})
+                   OR mm.content_text LIKE #{keyword}
+                   OR EXISTS (
+                       SELECT 1
+                       FROM mail_category_assignment mca
+                       JOIN mail_category mc ON mc.id = mca.category_id
+                       WHERE mca.user_id = mi.user_id
+                         AND mca.mail_id = mi.mail_id
+                         AND mc.name LIKE #{keyword}
+                   ))
               <if test="folder != null">
               AND mi.folder = #{folder}
+              </if>
+              <if test="categoryId != null">
+              AND EXISTS (
+                  SELECT 1 FROM mail_category_assignment mca
+                  WHERE mca.user_id = mi.user_id
+                    AND mca.mail_id = mi.mail_id
+                    AND mca.category_id = #{categoryId}
+              )
+              </if>
+              <if test="starred != null and starred">
+              AND mi.star_flag = TRUE
               </if>
             </script>
             """)
     long countByKeyword(@Param("userId") Long userId,
                         @Param("keyword") String keyword,
-                        @Param("folder") String folder);
+                        @Param("folder") String folder,
+                        @Param("categoryId") Long categoryId,
+                        @Param("starred") Boolean starred);
 
     @Select("""
             SELECT * FROM mailbox_item
