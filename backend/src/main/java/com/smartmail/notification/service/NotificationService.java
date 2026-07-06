@@ -17,12 +17,14 @@ public class NotificationService {
 
     public NotificationPollResponse poll(LocalDateTime since) {
         Long userId = UserContext.requireUserId();
-        LocalDateTime effectiveSince = since == null ? LocalDateTime.now().minusDays(1) : since;
+        LocalDateTime cursor = LocalDateTime.now();
+        LocalDateTime effectiveSince = since == null ? cursor.minusDays(1) : since;
         return new NotificationPollResponse(
                 mailboxMapper.countUnread(userId),
-                mailboxMapper.countSince(userId, effectiveSince),
+                mailboxMapper.countSince(userId, effectiveSince, cursor),
                 mailboxMapper.countByFolder(userId, "INBOX"),
-                mailboxMapper.countByFolder(userId, "JUNK")
+                mailboxMapper.countByFolder(userId, "JUNK"),
+                cursor
         );
     }
 }

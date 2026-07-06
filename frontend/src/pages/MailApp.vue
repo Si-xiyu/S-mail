@@ -22,13 +22,7 @@ const savedPollInterval = Number(localStorage.getItem('smartmail_poll_interval')
 const pollInterval = ref([15, 30, 60, 120].includes(savedPollInterval) ? savedPollInterval : 30)
 let pollTimer: number | undefined
 let lastPollCursor = ''
-
-const toLocalDateTime = (date: Date) => {
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-    + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-    + `.${String(date.getMilliseconds()).padStart(3, '0')}`
-}
+let synchronizationInitialized = false
 
 const schedulePolling = () => {
   window.clearInterval(pollTimer)
@@ -38,13 +32,15 @@ const schedulePolling = () => {
 const pollMailbox = async (manual: boolean) => {
   if (syncing.value || !mailStore.user) return
   syncing.value = true
-  const requestStartedAt = new Date()
   try {
-    const notification = await apiClient.pollNotifications(lastPollCursor || toLocalDateTime(requestStartedAt))
+    const notification = await apiClient.pollNotifications(lastPollCursor || undefined)
     mailStore.applyNotificationCounts(notification)
-    lastPollCursor = toLocalDateTime(requestStartedAt)
+    lastPollCursor = notification.cursor
     lastSyncedAt.value = new Date()
-    if (notification.newMailCount > 0) {
+    if (!synchronizationInitialized) {
+      synchronizationInitialized = true
+      await mailStore.refreshCurrent()
+    } else if (notification.newMailCount > 0) {
       await mailStore.refreshCurrent()
       ElNotification({
         title: '收到新邮件',
@@ -70,7 +66,6 @@ onMounted(() => {
   window.addEventListener('smartmail:unauthorized', handleUnauthorized)
   window.addEventListener('smartmail:draft-changed', handleDraftChanged)
   mailStore.refreshDraftCount()
-  lastPollCursor = toLocalDateTime(new Date())
   void pollMailbox(false)
   schedulePolling()
 })

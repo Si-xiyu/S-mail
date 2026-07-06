@@ -221,32 +221,17 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 加载所有标星邮件
    */
-  const loadStarredMails = async (): Promise<void> => {
+  const loadStarredMails = async (requestedPage: number = 1): Promise<void> => {
     isLoading.value = true
     error.value = null
     try {
-      // 从所有标准 folder 加载邮件，过滤出标星的
-      const folders = ['INBOX', 'SENT', 'TRASH', 'JUNK']
-      const allStarred: MailboxItem[] = []
-
-      for (const folder of folders) {
-        try {
-          const result = await apiClient.listMailbox(folder, 1, 50)
-          const starred = result.records.filter(item => item.starred)
-          allStarred.push(...starred)
-        } catch (err) {
-          // 如果是认证错误，忽略
-          if (err instanceof Error && err.message.includes('登录')) {
-            console.debug(`Skipping ${folder} due to auth error`)
-            continue
-          }
-          console.error(`Failed to load ${folder}:`, err)
-        }
-      }
-
-      mailboxItems.value = allStarred
-      total.value = allStarred.length
-      page.value = 1
+      const result = await apiClient.searchMailbox(
+        '', undefined, undefined, true, requestedPage, pageSize.value
+      )
+      mailboxItems.value = result.records
+      total.value = result.total
+      page.value = result.page
+      pageSize.value = result.pageSize
       currentLabel.value = 'STARRED'
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载星标邮件失败'
@@ -270,13 +255,6 @@ export const useMailStore = defineStore('mail', () => {
     try {
       const detail = await apiClient.getMailDetail(mailId)
       mailDetailCache.value.set(mailId, detail)
-
-      // 更新对应的 mailboxItem 的已读状态
-      const item = mailboxItems.value.find(m => m.mailId === mailId)
-      if (item) {
-        item.read = true
-      }
-
       return detail
     } catch (err) {
       error.value = err instanceof Error ? err.message : '获取邮件详情失败'
@@ -321,7 +299,11 @@ export const useMailStore = defineStore('mail', () => {
     const trimmed = keyword.trim()
     searchQuery.value = trimmed
     if (!trimmed) {
-      await loadMailbox(currentLabel.value, requestedPage, pageSize.value)
+      if (currentLabel.value === 'STARRED') {
+        await loadStarredMails(requestedPage)
+      } else {
+        await loadMailbox(currentLabel.value, requestedPage, pageSize.value)
+      }
       return
     }
     isLoading.value = true
@@ -350,7 +332,7 @@ export const useMailStore = defineStore('mail', () => {
     if (searchQuery.value) {
       await searchMailbox(searchQuery.value, page.value)
     } else if (currentLabel.value === 'STARRED') {
-      await loadStarredMails()
+      await loadStarredMails(page.value)
     } else {
       await loadMailbox(currentLabel.value, page.value, pageSize.value)
     }
@@ -399,6 +381,7 @@ export const useMailStore = defineStore('mail', () => {
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '更新邮件状态失败'
+      throw err
     }
   }
 
@@ -416,6 +399,7 @@ export const useMailStore = defineStore('mail', () => {
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '更新星标状态失败'
+      throw err
     }
   }
 
@@ -431,6 +415,7 @@ export const useMailStore = defineStore('mail', () => {
       await loadMailbox(currentLabel.value)
     } catch (err) {
       error.value = err instanceof Error ? err.message : '删除邮件失败'
+      throw err
     }
   }
 
@@ -448,6 +433,7 @@ export const useMailStore = defineStore('mail', () => {
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '移动邮件失败'
+      throw err
     }
   }
 

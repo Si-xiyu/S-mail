@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
+import { ElMessage } from 'element-plus'
 import { computed, ref } from 'vue'
 
 const mailStore = useMailStore()
@@ -9,10 +10,22 @@ const emit = defineEmits<{
   selectMail: [mailId: string]
 }>()
 
-const handleSelectMail = (mailId: string) => {
+const handleSelectMail = async (mailId: string) => {
   selectedMailId.value = mailId
-  mailStore.markAsRead(mailId)
+  try {
+    await mailStore.markAsRead(mailId)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '更新已读状态失败')
+  }
   emit('selectMail', mailId)
+}
+
+const handleToggleStar = async (mailId: string) => {
+  try {
+    await mailStore.toggleStar(mailId)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '更新星标失败')
+  }
 }
 
 const rangeStart = computed(() => mailStore.total ? (mailStore.page - 1) * mailStore.pageSize + 1 : 0)
@@ -23,6 +36,8 @@ const hasNext = computed(() => mailStore.page * mailStore.pageSize < mailStore.t
 const changePage = async (nextPage: number) => {
   if (mailStore.searchQuery) {
     await mailStore.searchMailbox(mailStore.searchQuery, nextPage)
+  } else if (mailStore.currentLabel === 'STARRED') {
+    await mailStore.loadStarredMails(nextPage)
   } else {
     await mailStore.loadMailbox(mailStore.currentLabel, nextPage, mailStore.pageSize)
   }
@@ -86,7 +101,7 @@ const formatTime = (timestamp: number) => {
           <button
             class="star-btn"
             :class="{ starred: item.starred }"
-            @click.stop="mailStore.toggleStar(item.id)"
+            @click.stop="handleToggleStar(item.id)"
           >
             ⭐
           </button>

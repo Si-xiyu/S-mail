@@ -203,8 +203,9 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
               AND deleted_flag = FALSE
               AND folder IN ('INBOX', 'JUNK')
               AND received_at > #{since}
+              AND received_at <= #{until}
             """)
-    long countSince(Long userId, LocalDateTime since);
+    long countSince(Long userId, LocalDateTime since, LocalDateTime until);
 
     @Select("""
             <script>

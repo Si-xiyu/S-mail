@@ -35,6 +35,8 @@ const load = async () => {
       await mailStore.markMailRead(detail.value.itemId, true)
       detail.value.read = true
     }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载邮件失败')
   } finally {
     loading.value = false
   }
@@ -89,36 +91,64 @@ const sendReply = async () => {
 
 const toggleStar = async () => {
   if (!detail.value) return
-  await mailStore.starMail(detail.value.itemId, !detail.value.starred)
-  detail.value.starred = !detail.value.starred
+  try {
+    await mailStore.starMail(detail.value.itemId, !detail.value.starred)
+    detail.value.starred = !detail.value.starred
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '更新星标失败')
+  }
 }
 
 const deleteMail = async () => {
   if (!detail.value) return
-  await mailStore.deleteMail(String(detail.value.mailId))
-  emit('close')
+  try {
+    await mailStore.deleteMail(String(detail.value.mailId))
+    emit('close')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '删除邮件失败')
+  }
 }
 
 const restoreMail = async () => {
   if (!detail.value) return
-  await mailStore.moveMail(detail.value.itemId, 'RESTORE')
-  await mailStore.refreshCurrent()
-  emit('close')
+  try {
+    await mailStore.moveMail(detail.value.itemId, 'RESTORE')
+    await mailStore.refreshCurrent()
+    emit('close')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '恢复邮件失败')
+  }
 }
 
 const moveToJunk = async () => {
   if (!detail.value) return
-  await mailStore.moveMail(detail.value.itemId, 'JUNK')
-  await mailStore.refreshCurrent()
-  emit('close')
+  try {
+    await mailStore.moveMail(detail.value.itemId, 'JUNK')
+    await mailStore.refreshCurrent()
+    emit('close')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '移动邮件失败')
+  }
 }
 
 const assignLabel = async (event: Event) => {
   if (!detail.value) return
   const categoryId = (event.target as HTMLSelectElement).value
   if (!categoryId) return
-  await mailStore.changeCategory(String(detail.value.mailId), categoryId)
-  ElMessage.success('标签已更新')
+  try {
+    await mailStore.changeCategory(String(detail.value.mailId), categoryId)
+    ElMessage.success('标签已更新')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '更新标签失败')
+  }
+}
+
+const downloadAttachment = async (attachmentId: number, fileName: string) => {
+  try {
+    await apiClient.downloadAttachment(attachmentId, fileName)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '下载附件失败')
+  }
 }
 </script>
 
@@ -161,7 +191,7 @@ const assignLabel = async (event: Event) => {
           <section v-if="detail.attachments.length" class="attachments">
             <h2>附件</h2>
             <button v-for="attachment in detail.attachments" :key="attachment.id" type="button"
-              @click="apiClient.downloadAttachment(attachment.id, attachment.fileName)">
+              @click="downloadAttachment(attachment.id, attachment.fileName)">
               📎 {{ attachment.fileName }} · {{ Math.ceil(attachment.fileSize / 1024) }} KB
             </button>
           </section>
