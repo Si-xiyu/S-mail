@@ -42,7 +42,7 @@ class MailContext(BaseModel):
 
 class ToolResult(BaseModel):
     ok: bool
-    data: dict[str, Any] | None = None
+    data: dict[str, Any] | list[Any] | None = None
     error: str | None = None
 
 
