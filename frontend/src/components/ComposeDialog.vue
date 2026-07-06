@@ -168,23 +168,30 @@ const discardDraft = async () => {
 </template>
 
 <style scoped>
-.compose-dialog { position: fixed; right: 24px; bottom: 0; z-index: 500; width: 520px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid #dfe3e8; border-bottom: 0; border-radius: 12px 12px 0 0; box-shadow: 0 -8px 30px rgba(15, 23, 42, .16); }
+.compose-dialog { position: fixed; right: 24px; bottom: 0; z-index: 500; width: 560px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid #e0e0e0; border-bottom: 0; border-radius: 6px 6px 0 0; box-shadow: 0 -4px 24px rgba(0, 0, 0, .06); }
 .compose-dialog.minimized { width: 300px; }
-.compose-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; color: #fff; background: #312e81; border-radius: 11px 11px 0 0; }
-.icon-btn { border: 0; color: inherit; background: transparent; cursor: pointer; }
+.compose-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; color: rgba(255, 255, 255, .9); background: #37352f; border-radius: 5px 5px 0 0; font-size: 13px; }
+.compose-header strong { font-weight: 500; }
+.icon-btn { border: 0; color: inherit; background: transparent; cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 14px; opacity: .7; transition: opacity 0.1s; }
+.icon-btn:hover { opacity: 1; background: rgba(255, 255, 255, .1); }
 .compose-body { display: flex; flex-direction: column; }
-.field { border: 0; border-bottom: 1px solid #e5e7eb; padding: 11px 16px; outline: none; }
-.content { min-height: 220px; padding: 16px; border: 0; resize: vertical; outline: none; font: inherit; }
+.field { border: 0; border-bottom: 1px solid #e0e0e0; padding: 12px 16px; outline: none; font-size: 13px; color: #37352f; }
+.field::placeholder { color: rgba(55, 53, 47, 0.35); }
+.content { min-height: 240px; padding: 16px; border: 0; resize: vertical; outline: none; font: inherit; font-size: 13px; color: #37352f; line-height: 1.6; }
+.content::placeholder { color: rgba(55, 53, 47, 0.35); }
 .attachment-list { padding: 0 16px 8px; display: grid; gap: 6px; }
-.attachment { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: #f3f4f6; border-radius: 8px; font-size: 13px; }
-.attachment button, .discard-btn { border: 0; background: transparent; color: #dc2626; cursor: pointer; }
-.compose-footer { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e5e7eb; }
-.send-btn { padding: 9px 24px; border: 0; border-radius: 8px; background: #4f46e5; color: #fff; cursor: pointer; }
-.send-btn:disabled { opacity: .55; cursor: wait; }
-.attach-btn { cursor: pointer; color: #4338ca; font-size: 13px; }
-.attach-btn.disabled { opacity: .55; }
+.attachment { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; background: #fbfbfa; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 12px; color: #37352f; }
+.attachment button, .discard-btn { border: 0; background: transparent; color: rgba(55, 53, 47, 0.5); cursor: pointer; font-size: 12px; transition: color 0.1s; }
+.attachment button:hover, .discard-btn:hover { color: #e03e3e; }
+.compose-footer { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e0e0e0; }
+.send-btn { padding: 8px 22px; border: 0; border-radius: 4px; background: #37352f; color: #fff; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.15s; }
+.send-btn:hover:not(:disabled) { background: #2b2925; }
+.send-btn:disabled { opacity: .45; cursor: wait; }
+.attach-btn { cursor: pointer; color: rgba(55, 53, 47, 0.55); font-size: 12px; padding: 8px 0; transition: color 0.1s; }
+.attach-btn:hover:not(.disabled) { color: #37352f; }
+.attach-btn.disabled { opacity: .45; cursor: default; }
 .attach-btn input { display: none; }
-.discard-btn { margin-left: auto; }
+.discard-btn { margin-left: auto; font-size: 12px; }
 .compose-enter-active, .compose-leave-active { transition: transform .2s ease, opacity .2s ease; }
 .compose-enter-from, .compose-leave-to { transform: translateY(100%); opacity: 0; }
 @media (max-width: 640px) { .compose-dialog { right: 8px; width: calc(100vw - 16px); } }

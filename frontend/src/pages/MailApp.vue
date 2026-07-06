@@ -130,7 +130,7 @@ const handleComposeBtnClick = () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f9fafb;
+  background: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 

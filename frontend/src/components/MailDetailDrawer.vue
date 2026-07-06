@@ -216,32 +216,43 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
 </template>
 
 <style scoped>
-.drawer-overlay { position: fixed; inset: 0; z-index: 300; display: flex; justify-content: flex-end; background: rgba(15, 23, 42, .28); }
-.drawer-panel { width: min(720px, 92vw); height: 100%; display: flex; flex-direction: column; background: #fff; box-shadow: -12px 0 35px rgba(15, 23, 42, .18); }
-.drawer-header { min-height: 60px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; }
-.drawer-header button, .drawer-header select { border: 1px solid #d1d5db; border-radius: 7px; background: #fff; padding: 7px 10px; cursor: pointer; }
-.header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.drawer-content { overflow-y: auto; padding: 28px 34px 48px; }
-h1 { margin: 0 0 22px; font-size: 26px; color: #111827; }
-.meta { display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center; }
-.meta small { display: block; margin-top: 4px; color: #6b7280; }
-.meta time { color: #6b7280; font-size: 12px; }
-.avatar { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: #4338ca; background: #e0e7ff; font-weight: 700; }
-.body, .thread { margin-top: 28px; white-space: pre-wrap; line-height: 1.75; color: #1f2937; }
-.thread details { padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
-.thread summary { cursor: pointer; color: #4b5563; }
-.thread p { white-space: pre-wrap; }
-.attachments { margin-top: 24px; }
-.attachments h2 { font-size: 15px; }
-.attachments button { display: block; width: 100%; padding: 10px 12px; margin: 7px 0; text-align: left; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; cursor: pointer; }
-.reply-actions { display: flex; gap: 10px; margin-top: 28px; padding-top: 18px; border-top: 1px solid #e5e7eb; }
-.reply-actions button, .reply-panel button { padding: 9px 18px; border: 0; border-radius: 8px; color: #fff; background: #4f46e5; cursor: pointer; }
-.reply-panel { display: grid; gap: 10px; margin-top: 14px; }
-.reply-panel input, .reply-panel textarea { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; }
+.drawer-overlay { position: fixed; inset: 0; z-index: 300; display: flex; justify-content: flex-end; background: rgba(15, 23, 42, .2); }
+.drawer-panel { width: min(720px, 92vw); height: 100%; display: flex; flex-direction: column; background: #fff; box-shadow: -8px 0 30px rgba(0, 0, 0, .06); }
+.drawer-header { min-height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e0e0e0; }
+.drawer-header button, .drawer-header select { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; padding: 6px 10px; cursor: pointer; font-size: 12px; color: #37352f; transition: background 0.1s; }
+.drawer-header button:hover, .drawer-header select:hover { background: #f4f4f4; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.drawer-content { overflow-y: auto; padding: 32px 40px 60px; }
+h1 { margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #37352f; line-height: 1.4; }
+.meta { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; }
+.meta small { display: block; margin-top: 3px; color: rgba(55, 53, 47, 0.5); font-size: 12px; }
+.meta strong { color: #37352f; font-size: 14px; font-weight: 500; }
+.meta time { color: rgba(55, 53, 47, 0.45); font-size: 12px; }
+.avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: #37352f; background: #f0efed; font-weight: 600; font-size: 14px; }
+.body, .thread { margin-top: 32px; white-space: pre-wrap; line-height: 1.75; color: #37352f; font-size: 14px; }
+.thread details { padding: 14px 0; border-bottom: 1px solid #f0efed; }
+.thread details + details { margin-top: 0; }
+.thread summary { cursor: pointer; color: rgba(55, 53, 47, 0.55); font-size: 13px; padding: 4px 0; }
+.thread summary:hover { color: #37352f; }
+.thread p { white-space: pre-wrap; margin-top: 12px; }
+.attachments { margin-top: 28px; }
+.attachments h2 { font-size: 13px; font-weight: 500; color: rgba(55, 53, 47, 0.55); margin-bottom: 10px; }
+.attachments button { display: block; width: 100%; padding: 10px 14px; margin: 6px 0; text-align: left; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; color: #37352f; transition: background 0.1s; }
+.attachments button:hover { background: #f4f4f4; }
+.reply-actions { display: flex; gap: 10px; margin-top: 32px; padding-top: 20px; border-top: 1px solid #e0e0e0; }
+.reply-actions button { padding: 8px 20px; border: 1px solid #e0e0e0; border-radius: 4px; color: #37352f; background: #fff; cursor: pointer; font-size: 13px; transition: background 0.1s; }
+.reply-actions button:hover { background: #f4f4f4; }
+.reply-panel { display: grid; gap: 12px; margin-top: 16px; }
+.reply-panel input, .reply-panel textarea { padding: 10px 14px; border: 1px solid #e0e0e0; border-radius: 4px; font: inherit; font-size: 13px; color: #37352f; outline: none; }
+.reply-panel input:focus, .reply-panel textarea:focus { border-color: #37352f; }
 .reply-panel textarea { min-height: 140px; resize: vertical; }
-.reply-panel button + button { color: #374151; background: #e5e7eb; margin-left: 8px; }
-.state { margin: auto; color: #6b7280; }
+.reply-panel div { display: flex; gap: 8px; }
+.reply-panel div button:first-child { padding: 8px 20px; border: none; border-radius: 4px; color: #fff; background: #37352f; cursor: pointer; font-size: 13px; }
+.reply-panel div button:first-child:hover { background: #2b2925; }
+.reply-panel div button:last-child { padding: 8px 20px; border: 1px solid #e0e0e0; border-radius: 4px; color: #37352f; background: #fff; cursor: pointer; font-size: 13px; }
+.reply-panel div button:last-child:hover { background: #f4f4f4; }
+.state { margin: auto; color: rgba(55, 53, 47, 0.5); font-size: 13px; }
 .drawer-enter-active, .drawer-leave-active { transition: opacity .2s ease; }
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
-@media (max-width: 640px) { .drawer-panel { width: 100%; } .drawer-content { padding: 20px; } .meta { grid-template-columns: 42px 1fr; } .meta time { grid-column: 2; } }
+@media (max-width: 640px) { .drawer-panel { width: 100%; } .drawer-content { padding: 24px 20px; } .meta { grid-template-columns: 40px 1fr; } .meta time { grid-column: 2; } }
 </style>

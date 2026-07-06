@@ -11,11 +11,13 @@ body {
 }
 
 body {
-  color: #202124;
-  background: #f6f7f9;
+  color: #37352f;
+  background: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
 }
 
 #app {
@@ -42,12 +44,12 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: #e0e0e0;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #c0c0c0;
 }
 
 /* 响应式设计 */

@@ -189,8 +189,8 @@ const handleDeleteLabel = async (labelId: string) => {
 .sidebar {
   width: 240px;
   flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #e5e7eb;
+  background: #fbfbfa;
+  border-right: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
   padding: 16px 0;
@@ -203,11 +203,11 @@ const handleDeleteLabel = async (labelId: string) => {
 
 .compose-btn {
   width: 100%;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  padding: 9px 12px;
+  background: #37352f;
+  color: #fff;
   border: none;
-  border-radius: 12px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -215,37 +215,35 @@ const handleDeleteLabel = async (labelId: string) => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+  transition: background 0.15s;
 }
 
 .compose-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+  background: #2b2925;
 }
 
 .labels-section {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   padding: 0 8px;
 }
 
 .labels-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
+  margin-bottom: 12px;
 }
 
 .group-title {
-  padding: 8px 10px;
+  padding: 8px 12px 6px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #9ca3af;
-  letter-spacing: 0.5px;
-  margin-top: 4px;
+  color: rgba(55, 53, 47, 0.4);
+  letter-spacing: 0.6px;
 }
 
 .section-title {
@@ -260,26 +258,25 @@ const handleDeleteLabel = async (labelId: string) => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 7px 12px;
   background: transparent;
   border: none;
-  border-radius: 0 20px 20px 0;
+  border-radius: 4px;
   cursor: pointer;
-  color: #374151;
+  color: #37352f;
   font-size: 13px;
-  transition: all 0.2s;
+  transition: background 0.1s;
   width: 100%;
   justify-content: flex-start;
   position: relative;
 }
 
 .label-item:hover {
-  background: #f3f4f6;
+  background: #f4f4f4;
 }
 
 .label-item.active {
-  background: #e0e7ff;
-  color: #667eea;
+  background: #f0efed;
   font-weight: 500;
 }
 
@@ -288,9 +285,10 @@ const handleDeleteLabel = async (labelId: string) => {
 }
 
 .label-icon {
-  flex: 0 0 20px;
+  flex: 0 0 18px;
   text-align: center;
-  font-size: 16px;
+  font-size: 14px;
+  opacity: 0.65;
 }
 
 .label-name {
@@ -299,101 +297,97 @@ const handleDeleteLabel = async (labelId: string) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: inherit;
 }
 
 .label-count {
   flex: 0 0 auto;
   padding: 2px 6px;
-  background: #f3f4f6;
-  border-radius: 10px;
-  font-size: 11px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.label-item.active .label-count {
   background: transparent;
-  color: #667eea;
+  border-radius: 3px;
+  font-size: 11px;
+  color: rgba(55, 53, 47, 0.45);
+  font-weight: 400;
 }
 
 .label-delete-btn {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   background: none;
   border: none;
-  color: #ef4444;
+  color: rgba(55, 53, 47, 0.4);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
+  border-radius: 3px;
+  transition: all 0.15s;
 }
 
 .label-delete-btn:hover {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #f4f4f4;
+  color: #e03e3e;
 }
 
 .sidebar-footer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding: 12px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e0e0e0;
   margin-top: auto;
 }
 
 .add-tag-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 7px 12px;
   background: transparent;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  color: #667eea;
+  color: rgba(55, 53, 47, 0.5);
   font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.1s;
   width: 100%;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .add-tag-btn:hover {
-  background: #f0f4ff;
-  border-color: #667eea;
+  background: #f4f4f4;
+  color: #37352f;
 }
 
 .add-tag-btn svg {
-  flex: 0 0 20px;
+  flex: 0 0 18px;
+  opacity: 0.65;
 }
 
 .add-tag-input-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .tag-input {
-  padding: 8px 10px;
-  border: 1px solid #667eea;
-  border-radius: 6px;
+  padding: 7px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   font-size: 13px;
   outline: none;
-  transition: all 0.2s;
+  transition: border-color 0.15s;
   width: 100%;
   box-sizing: border-box;
+  color: #37352f;
 }
 
 .tag-input:focus {
-  border-color: #764ba2;
-  box-shadow: 0 0 4px rgba(102, 126, 234, 0.2);
+  border-color: #37352f;
 }
 
 .input-actions {
@@ -403,34 +397,18 @@ const handleDeleteLabel = async (labelId: string) => {
 
 .input-actions .action-btn {
   flex: 1;
-  padding: 6px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: white;
+  padding: 5px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
   cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.1s;
+  color: #37352f;
 }
 
-.input-actions .action-btn.confirm {
-  color: #10b981;
-  border-color: #10b981;
-}
-
-.input-actions .action-btn.confirm:hover {
-  background: #f0fdf4;
-  border-color: #059669;
-}
-
-.input-actions .action-btn.cancel {
-  color: #ef4444;
-  border-color: #ef4444;
-}
-
-.input-actions .action-btn.cancel:hover {
-  background: #fef2f2;
-  border-color: #dc2626;
+.input-actions .action-btn:hover {
+  background: #f4f4f4;
 }
 
 .footer-buttons {
@@ -441,21 +419,21 @@ const handleDeleteLabel = async (labelId: string) => {
 .settings-btn,
 .help-btn {
   flex: 1;
-  padding: 8px;
+  padding: 7px;
   background: transparent;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  color: #6b7280;
+  color: rgba(55, 53, 47, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background 0.1s;
 }
 
 .settings-btn:hover,
 .help-btn:hover {
-  background: #f9fafb;
-  color: #1f2937;
+  background: #f4f4f4;
+  color: #37352f;
 }
 </style>

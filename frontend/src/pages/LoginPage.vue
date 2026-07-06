@@ -98,76 +98,93 @@ const goToRegister = () => {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f7f6f3;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  padding: 24px;
 }
 
 .login-card {
   width: 100%;
-  max-width: 400px;
-  padding: 40px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  max-width: 360px;
+  padding: 40px 36px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
 }
 
 .logo {
-  text-align: center;
-  margin-bottom: 30px;
+  text-align: left;
+  margin-bottom: 36px;
 }
 
 .logo h1 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  color: #333;
+  font-size: 22px;
+  font-weight: 600;
+  color: #37352f;
 }
 
 .logo p {
-  margin: 8px 0 0 0;
+  margin: 6px 0 0 0;
   font-size: 14px;
-  color: #999;
+  color: rgba(55, 53, 47, 0.55);
 }
 
 :deep(.el-form) {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 :deep(.el-form-item) {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 :deep(.el-input__wrapper) {
   padding: 8px 12px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #e0e0e0;
+}
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #b0b0b0;
+}
+:deep(.el-input.is-focus .el-input__wrapper) {
+  box-shadow: 0 0 0 2px rgba(55, 53, 47, 0.2);
 }
 
 .login-btn {
   width: 100%;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  border-radius: 4px;
+  margin-top: 4px;
+  background: #37352f;
+  border-color: #37352f;
+}
+.login-btn:hover {
+  background: #2b2925;
+  border-color: #2b2925;
 }
 
 .register-link {
   text-align: center;
-  font-size: 14px;
-  color: #666;
+  font-size: 13px;
+  color: rgba(55, 53, 47, 0.5);
+  margin-top: 20px;
 }
 
 .register-link :deep(.el-button) {
   padding: 0;
-  font-size: 14px;
+  font-size: 13px;
+  color: #37352f;
 }
 
 @media (max-width: 480px) {
   .login-card {
     max-width: 100%;
-    margin: 20px;
-    padding: 30px 20px;
+    padding: 28px 20px;
   }
-
   .logo h1 {
-    font-size: 24px;
+    font-size: 20px;
   }
 }
 </style>
