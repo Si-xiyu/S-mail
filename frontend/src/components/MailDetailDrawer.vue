@@ -5,7 +5,7 @@ import * as apiClient from '../api/client'
 import { useMailStore } from '../stores/mailStore'
 import type { MailDetail, ThreadMessage } from '../types/mail'
 
-const props = defineProps<{ mailId?: string | null }>()
+const props = defineProps<{ mailId?: string | null; inline?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const mailStore = useMailStore()
 
@@ -153,7 +153,65 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
 </script>
 
 <template>
-  <transition name="drawer">
+  <!-- Inline mode: rendered as a normal block panel -->
+  <div v-if="inline && mailId" class="inline-panel">
+    <header class="drawer-header">
+      <div v-if="detail" class="header-actions">
+        <button type="button" @click="toggleStar">{{ detail.starred ? '★' : '☆' }}</button>
+        <select aria-label="添加标签" @change="assignLabel">
+          <option value="">标签</option>
+          <option v-for="label in customLabels" :key="label.id" :value="label.id">{{ label.name }}</option>
+        </select>
+        <button v-if="isTrash" type="button" @click="restoreMail">恢复</button>
+        <button v-else type="button" @click="moveToJunk">移至 Junk</button>
+        <button type="button" @click="deleteMail">{{ isTrash ? '永久删除' : '删除' }}</button>
+      </div>
+    </header>
+
+    <div v-if="loading" class="state">正在加载邮件…</div>
+    <div v-else-if="!detail" class="state">{{ mailStore.error || '邮件不存在' }}</div>
+    <div v-else class="drawer-content">
+      <h1>{{ detail.subject }}</h1>
+      <div class="meta">
+        <span class="avatar">{{ detail.senderEmail.charAt(0).toUpperCase() }}</span>
+        <div><strong>{{ detail.senderEmail }}</strong><small>发送至 {{ detail.recipients.join(', ') }}</small></div>
+        <time>{{ new Date(detail.sentAt).toLocaleString() }}</time>
+      </div>
+
+      <section v-if="thread.length > 1" class="thread">
+        <details v-for="message in thread" :key="message.mailId" :open="message.mailId === detail.mailId">
+          <summary>{{ message.senderEmail }} · {{ new Date(message.sentAt).toLocaleString() }}</summary>
+          <p>{{ message.contentText }}</p>
+        </details>
+      </section>
+      <article v-else class="body">{{ detail.contentText }}</article>
+
+      <section v-if="detail.attachments.length" class="attachments">
+        <h2>附件</h2>
+        <button v-for="attachment in detail.attachments" :key="attachment.id" type="button"
+          @click="downloadAttachment(attachment.id, attachment.fileName)">
+          📎 {{ attachment.fileName }} · {{ Math.ceil(attachment.fileSize / 1024) }} KB
+        </button>
+      </section>
+
+      <div class="reply-actions">
+        <button type="button" @click="startReply">回复</button>
+        <button type="button" @click="startForward">转发</button>
+      </div>
+
+      <section v-if="replyMode !== 'none'" class="reply-panel">
+        <input v-model="replyTo" placeholder="收件人，多个地址用逗号分隔" />
+        <textarea v-model="replyContent" :placeholder="replyMode === 'reply' ? '撰写回复' : '补充转发说明'"></textarea>
+        <div>
+          <button type="button" :disabled="sending" @click="sendReply">{{ sending ? '发送中…' : '发送' }}</button>
+          <button type="button" @click="replyMode = 'none'">取消</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Overlay mode (original drawer behavior) -->
+  <transition v-else name="drawer">
     <div v-if="mailId" class="drawer-overlay" @click.self="emit('close')">
       <aside class="drawer-panel">
         <header class="drawer-header">
@@ -216,43 +274,66 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
 </template>
 
 <style scoped>
+/* ---- inline panel ---- */
+.inline-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fbfbfa;
+}
+
+/* ---- overlay drawer ---- */
 .drawer-overlay { position: fixed; inset: 0; z-index: 300; display: flex; justify-content: flex-end; background: rgba(15, 23, 42, .2); }
 .drawer-panel { width: min(720px, 92vw); height: 100%; display: flex; flex-direction: column; background: #fff; box-shadow: -8px 0 30px rgba(0, 0, 0, .06); }
-.drawer-header { min-height: 52px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e0e0e0; }
-.drawer-header button, .drawer-header select { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; padding: 6px 10px; cursor: pointer; font-size: 12px; color: #37352f; transition: background 0.1s; }
+
+/* ---- shared ---- */
+.drawer-header {
+  min-height: 44px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fbfbfa;
+}
+
+.drawer-header button, .drawer-header select { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; padding: 5px 10px; cursor: pointer; font-size: 12px; color: #37352f; transition: background 0.1s; }
 .drawer-header button:hover, .drawer-header select:hover { background: #f4f4f4; }
-.header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
-.drawer-content { overflow-y: auto; padding: 32px 40px 60px; }
-h1 { margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #37352f; line-height: 1.4; }
-.meta { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; }
-.meta small { display: block; margin-top: 3px; color: rgba(55, 53, 47, 0.5); font-size: 12px; }
+.header-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: 1; }
+.drawer-content { overflow-y: auto; padding: 28px 32px 48px; flex: 1; }
+.inline-panel .drawer-content { padding: 24px 28px 40px; }
+h1 { margin: 0 0 20px; font-size: 22px; font-weight: 600; color: #37352f; line-height: 1.4; }
+.inline-panel h1 { font-size: 20px; }
+.meta { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; }
+.meta small { display: block; margin-top: 2px; color: rgba(55, 53, 47, 0.5); font-size: 12px; }
 .meta strong { color: #37352f; font-size: 14px; font-weight: 500; }
-.meta time { color: rgba(55, 53, 47, 0.45); font-size: 12px; }
-.avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: #37352f; background: #f0efed; font-weight: 600; font-size: 14px; }
-.body, .thread { margin-top: 32px; white-space: pre-wrap; line-height: 1.75; color: #37352f; font-size: 14px; }
-.thread details { padding: 14px 0; border-bottom: 1px solid #f0efed; }
+.meta time { color: rgba(55, 53, 47, 0.45); font-size: 11px; }
+.avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: #37352f; background: #f0efed; font-weight: 600; font-size: 13px; }
+.body, .thread { margin-top: 28px; white-space: pre-wrap; line-height: 1.75; color: #37352f; font-size: 14px; }
+.inline-panel .body, .inline-panel .thread { margin-top: 24px; font-size: 13px; }
+.thread details { padding: 12px 0; border-bottom: 1px solid #f0efed; }
 .thread details + details { margin-top: 0; }
-.thread summary { cursor: pointer; color: rgba(55, 53, 47, 0.55); font-size: 13px; padding: 4px 0; }
+.thread summary { cursor: pointer; color: rgba(55, 53, 47, 0.5); font-size: 12px; padding: 4px 0; }
 .thread summary:hover { color: #37352f; }
-.thread p { white-space: pre-wrap; margin-top: 12px; }
-.attachments { margin-top: 28px; }
-.attachments h2 { font-size: 13px; font-weight: 500; color: rgba(55, 53, 47, 0.55); margin-bottom: 10px; }
-.attachments button { display: block; width: 100%; padding: 10px 14px; margin: 6px 0; text-align: left; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; color: #37352f; transition: background 0.1s; }
+.thread p { white-space: pre-wrap; margin-top: 10px; font-size: 13px; }
+.attachments { margin-top: 24px; }
+.attachments h2 { font-size: 12px; font-weight: 500; color: rgba(55, 53, 47, 0.5); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+.attachments button { display: block; width: 100%; padding: 9px 14px; margin: 5px 0; text-align: left; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; color: #37352f; transition: background 0.1s; }
 .attachments button:hover { background: #f4f4f4; }
-.reply-actions { display: flex; gap: 10px; margin-top: 32px; padding-top: 20px; border-top: 1px solid #e0e0e0; }
-.reply-actions button { padding: 8px 20px; border: 1px solid #e0e0e0; border-radius: 4px; color: #37352f; background: #fff; cursor: pointer; font-size: 13px; transition: background 0.1s; }
+.reply-actions { display: flex; gap: 8px; margin-top: 28px; padding-top: 18px; border-top: 1px solid #e0e0e0; }
+.reply-actions button { padding: 7px 18px; border: 1px solid #e0e0e0; border-radius: 4px; color: #37352f; background: #fff; cursor: pointer; font-size: 13px; transition: background 0.1s; }
 .reply-actions button:hover { background: #f4f4f4; }
-.reply-panel { display: grid; gap: 12px; margin-top: 16px; }
-.reply-panel input, .reply-panel textarea { padding: 10px 14px; border: 1px solid #e0e0e0; border-radius: 4px; font: inherit; font-size: 13px; color: #37352f; outline: none; }
+.reply-panel { display: grid; gap: 10px; margin-top: 14px; }
+.reply-panel input, .reply-panel textarea { padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 4px; font: inherit; font-size: 13px; color: #37352f; outline: none; }
 .reply-panel input:focus, .reply-panel textarea:focus { border-color: #37352f; }
-.reply-panel textarea { min-height: 140px; resize: vertical; }
+.reply-panel textarea { min-height: 120px; resize: vertical; }
 .reply-panel div { display: flex; gap: 8px; }
-.reply-panel div button:first-child { padding: 8px 20px; border: none; border-radius: 4px; color: #fff; background: #37352f; cursor: pointer; font-size: 13px; }
+.reply-panel div button:first-child { padding: 7px 18px; border: none; border-radius: 4px; color: #fff; background: #37352f; cursor: pointer; font-size: 13px; }
 .reply-panel div button:first-child:hover { background: #2b2925; }
-.reply-panel div button:last-child { padding: 8px 20px; border: 1px solid #e0e0e0; border-radius: 4px; color: #37352f; background: #fff; cursor: pointer; font-size: 13px; }
+.reply-panel div button:last-child { padding: 7px 18px; border: 1px solid #e0e0e0; border-radius: 4px; color: #37352f; background: #fff; cursor: pointer; font-size: 13px; }
 .reply-panel div button:last-child:hover { background: #f4f4f4; }
-.state { margin: auto; color: rgba(55, 53, 47, 0.5); font-size: 13px; }
+.state { margin: auto; color: rgba(55, 53, 47, 0.5); font-size: 13px; padding: 32px; }
 .drawer-enter-active, .drawer-leave-active { transition: opacity .2s ease; }
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
-@media (max-width: 640px) { .drawer-panel { width: 100%; } .drawer-content { padding: 24px 20px; } .meta { grid-template-columns: 40px 1fr; } .meta time { grid-column: 2; } }
+@media (max-width: 640px) { .drawer-panel { width: 100%; } .drawer-content { padding: 20px; } .meta { grid-template-columns: 36px 1fr; } .meta time { grid-column: 2; } }
 </style>

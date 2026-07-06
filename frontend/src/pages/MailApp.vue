@@ -7,6 +7,7 @@ import TopBar from '../components/TopBar.vue'
 import Sidebar from '../components/Sidebar.vue'
 import MailList from '../components/MailList.vue'
 import MailDetailDrawer from '../components/MailDetailDrawer.vue'
+import WelcomePanel from '../components/WelcomePanel.vue'
 import ComposeDialog from '../components/ComposeDialog.vue'
 import SettingsDialog from '../components/SettingsDialog.vue'
 import { useMailStore } from '../stores/mailStore'
@@ -110,7 +111,23 @@ const handleComposeBtnClick = () => {
         @settings-click="showSettings = true"
       />
 
-      <MailList @select-mail="handleSelectMail" />
+      <MailList
+        :selected-mail-id="selectedMailId"
+        @select-mail="handleSelectMail"
+      />
+
+      <div class="right-panel">
+        <WelcomePanel
+          v-if="!selectedMailId"
+          @compose-click="handleComposeBtnClick"
+        />
+        <MailDetailDrawer
+          v-else
+          :mail-id="selectedMailId"
+          inline
+          @close="selectedMailId = null"
+        />
+      </div>
     </div>
 
     <ComposeDialog v-model="showCompose" />
@@ -121,7 +138,6 @@ const handleComposeBtnClick = () => {
       :syncing="syncing"
       @sync-now="pollMailbox(true)"
     />
-    <MailDetailDrawer :mail-id="selectedMailId" @close="selectedMailId = null" />
   </div>
 </template>
 
@@ -139,5 +155,13 @@ const handleComposeBtnClick = () => {
   flex: 1;
   overflow: hidden;
   gap: 0;
+}
+
+.right-panel {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid #e0e0e0;
+  background: #fbfbfa;
+  overflow-y: auto;
 }
 </style>

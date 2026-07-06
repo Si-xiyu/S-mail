@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
 import { ElMessage } from 'element-plus'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+
+const props = defineProps<{
+  selectedMailId?: string | null
+}>()
 
 const mailStore = useMailStore()
-const selectedMailId = ref<string | null>(null)
 
 const emit = defineEmits<{
   selectMail: [mailId: string]
 }>()
 
 const handleSelectMail = async (mailId: string) => {
-  selectedMailId.value = mailId
   try {
     await mailStore.markAsRead(mailId)
   } catch (error) {
@@ -88,7 +90,7 @@ const formatTime = (timestamp: number) => {
         :key="item.id"
         class="mail-row"
         :class="{
-          selected: selectedMailId === item.id,
+          selected: props.selectedMailId === item.id,
           unread: !item.read
         }"
         @click="handleSelectMail(item.id)"
