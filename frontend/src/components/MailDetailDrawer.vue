@@ -34,12 +34,6 @@ const handleForward = () => {
   console.log('Forward mail:', mail.value?.id)
 }
 
-const handleMarkAsSpam = () => {
-  if (mail.value) {
-    mailStore.moveToLabel(mail.value.id, 'SPAM')
-  }
-}
-
 const handleDelete = () => {
   if (mail.value) {
     mailStore.deleteMail(mail.value.id)
@@ -139,7 +133,6 @@ const handleBackdropClick = () => {
           </div>
 
           <div class="more-actions">
-            <button class="text-btn" @click="handleMarkAsSpam">Mark as spam</button>
             <button class="text-btn">Report phishing</button>
           </div>
         </div>

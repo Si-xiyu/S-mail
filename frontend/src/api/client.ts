@@ -104,7 +104,7 @@ export async function register(email: string, username: string, password: string
 // ============ 邮箱 API ============
 /**
  * 获取邮箱列表
- * @param folder 文件夹类型，如 INBOX、SENT、DRAFTS、TRASH、JUNK、STARRED
+ * @param folder 文件夹类型，如 INBOX、SENT、TRASH、STARRED
  * @param page 页码，默认 1
  * @param pageSize 每页数量，默认 20
  * @returns 邮箱项列表

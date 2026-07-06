@@ -18,9 +18,7 @@ export const useMailStore = defineStore('mail', () => {
     { id: 'INBOX', name: '收件箱', count: 0, color: '#1f2937' },
     { id: 'STARRED', name: '标星', count: 0, color: '#f59e0b' },
     { id: 'SENT', name: '已发送', count: 0, color: '#10b981' },
-    { id: 'DRAFTS', name: '草稿', count: 0, color: '#8b5cf6' },
-    { id: 'TRASH', name: '垃圾箱', count: 0, color: '#ef4444' },
-    { id: 'JUNK', name: '垃圾邮件', count: 0, color: '#6b7280' }
+    { id: 'TRASH', name: '垃圾箱', count: 0, color: '#ef4444' }
   ])
 
   // 真实邮件数据：从后端获取的 MailboxItem
@@ -66,6 +64,34 @@ export const useMailStore = defineStore('mail', () => {
   })
 
   // ============ 方法 ============
+
+  /**
+   * 实时计算指定标签的未读邮件数量
+   */
+  const getUnreadCount = (labelId: string): number => {
+    if (labelId === 'STARRED') {
+      // STARRED: 统计所有未读的星标邮件
+      return mailboxItems.value.filter(m => m.starred && !m.read).length
+    } else if (labelId === 'INBOX' || labelId === 'SENT' || labelId === 'TRASH') {
+      // 标准文件夹: 如果当前标签是这个文件夹，则统计当前加载的邮件
+      // 否则需要从所有加载过的邮件中统计（但这不现实）
+      // 更好的方案是在加载该文件夹时更新计数
+      if (currentLabel.value === labelId) {
+        return mailboxItems.value.filter(m => !m.read).length
+      }
+      // 对于未加载的文件夹，返回 label 中的计数
+      const label = labels.value.find(l => l.id === labelId)
+      return label?.count || 0
+    } else {
+      // 自定义分类: 如果当前标签是这个分类，则统计当前加载的邮件
+      if (currentLabel.value === labelId) {
+        return mailboxItems.value.filter(m => !m.read).length
+      }
+      // 对于未加载的分类，返回 label 中的计数
+      const label = labels.value.find(l => l.id === labelId)
+      return label?.count || 0
+    }
+  }
 
   /**
    * 登录
@@ -166,10 +192,13 @@ export const useMailStore = defineStore('mail', () => {
       mailboxItems.value = items
       currentLabel.value = folder
 
-      // 更新标签计数
+      // 统计未读邮件数量
+      const unreadCount = items.filter(item => !item.read).length
+
+      // 更新标签计数（显示未读数量）
       const label = labels.value.find(l => l.id === folder)
       if (label) {
-        label.count = items.length
+        label.count = unreadCount
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载邮箱失败'
@@ -186,7 +215,7 @@ export const useMailStore = defineStore('mail', () => {
     error.value = null
     try {
       // 从所有标准 folder 加载邮件，过滤出标星的
-      const folders = ['INBOX', 'SENT', 'TRASH', 'JUNK']
+      const folders = ['INBOX', 'SENT', 'TRASH']
       const allStarred: MailboxItem[] = []
 
       for (const folder of folders) {
@@ -206,6 +235,15 @@ export const useMailStore = defineStore('mail', () => {
 
       mailboxItems.value = allStarred
       currentLabel.value = 'STARRED'
+
+      // 统计未读的星标邮件数量
+      const unreadStarredCount = allStarred.filter(item => !item.read).length
+
+      // 更新 STARRED 标签计数
+      const starredLabel = labels.value.find(l => l.id === 'STARRED')
+      if (starredLabel) {
+        starredLabel.count = unreadStarredCount
+      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载星标邮件失败'
     } finally {
@@ -578,7 +616,7 @@ export const useMailStore = defineStore('mail', () => {
         color: cat.color
       }))
       // 替换现有的自定义标签（保留标准的文件夹标签）
-      const standardLabelIds = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
+      const standardLabelIds = ['INBOX', 'STARRED', 'SENT', 'TRASH']
       labels.value = labels.value.filter(l => standardLabelIds.includes(l.id)).concat(customLabels)
     } catch (err) {
       console.error('Failed to load categories:', err)
@@ -620,6 +658,7 @@ export const useMailStore = defineStore('mail', () => {
     addLabel,
     deleteLabel,
     initializeCategories,
+    getUnreadCount,
 
     // 向后兼容的方法
     getMailById,

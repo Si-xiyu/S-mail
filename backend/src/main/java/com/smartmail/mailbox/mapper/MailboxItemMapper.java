@@ -164,6 +164,20 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
 
     @Select("""
             <script>
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND read_flag = FALSE
+              AND mail_id IN
+              <foreach item="mailId" collection="mailIds" open="(" separator="," close=")">
+                #{mailId}
+              </foreach>
+            </script>
+            """)
+    long countUnreadByMailIds(@Param("userId") Long userId, @Param("mailIds") List<Long> mailIds);
+
+    @Select("""
+            <script>
             SELECT * FROM mailbox_item
             WHERE user_id = #{userId}
               AND deleted_flag = FALSE

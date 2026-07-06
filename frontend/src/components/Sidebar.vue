@@ -8,7 +8,7 @@ const newTagName = ref('')
 const hoveredLabelId = ref<string | null>(null)
 
 // 系统自带标签的 ID 列表
-const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
+const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'TRASH']
 
 // 系统自带标签（按照指定的顺序）
 const systemLabels = computed(() => {
@@ -43,9 +43,7 @@ const getLabelIcon = (labelId: string) => {
     INBOX: '📥',
     STARRED: '⭐',
     SENT: '📤',
-    DRAFTS: '✏️',
-    TRASH: '🗑️',
-    SPAM: '🚫'
+    TRASH: '🗑️'
   }
   return icons[labelId] || '📁'
 }
@@ -107,7 +105,7 @@ const handleDeleteLabel = async (labelId: string) => {
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
           <span class="label-name">{{ label.name }}</span>
-          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <span v-if="mailStore.getUnreadCount(label.id) > 0" class="label-count">{{ mailStore.getUnreadCount(label.id) }}</span>
         </button>
       </div>
 
@@ -125,7 +123,7 @@ const handleDeleteLabel = async (labelId: string) => {
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
           <span class="label-name">{{ label.name }}</span>
-          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <span v-if="mailStore.getUnreadCount(label.id) > 0" class="label-count">{{ mailStore.getUnreadCount(label.id) }}</span>
           <button
             v-if="hoveredLabelId === label.id"
             class="label-delete-btn"

@@ -22,7 +22,7 @@ const labelButtonRef = ref<HTMLElement | null>(null)
 const labelMenuPosition = ref({ top: 0, left: 240 })
 
 // 系统自带标签的 ID 列表
-const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'JUNK']
+const SYSTEM_LABEL_IDS = ['INBOX', 'STARRED', 'SENT', 'TRASH']
 
 // 只显示用户个性化标签
 const customLabels = computed(() => {
@@ -150,12 +150,6 @@ const handleSendReply = async () => {
     }
   } catch (err) {
     alert('Failed to send: ' + (err instanceof Error ? err.message : 'Unknown error'))
-  }
-}
-
-const handleMarkAsSpam = () => {
-  if (mail.value) {
-    mailStore.moveToLabel(mail.value.id, 'SPAM')
   }
 }
 
