@@ -297,7 +297,7 @@ class RuleEngine:
             return "HIGH"
         if hints:
             return "MEDIUM"
-        return "LOW"
+        return "NONE"
 
     def _find_terms(self, text: str, terms: tuple[str, ...]) -> bool:
         return any(term in text for term in terms)

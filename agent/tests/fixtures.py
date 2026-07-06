@@ -89,7 +89,7 @@ EXPECTED_ANALYSIS_RESPONSES: dict[str, dict[str, Any]] = {
         "category": {"id": None, "name": "Work"},
         "junk": False,
         "priority": "URGENT",
-        "riskLevel": "LOW",
+        "riskLevel": "NONE",
         "modelInfo": {
             "provider": "RULES",
             "mode": "rules-fallback",
@@ -128,7 +128,7 @@ EXPECTED_ANALYSIS_RESPONSES: dict[str, dict[str, Any]] = {
         "category": {"id": 7, "name": "Project"},
         "junk": False,
         "priority": "NORMAL",
-        "riskLevel": "LOW",
+        "riskLevel": "NONE",
         "modelInfo": {
             "provider": "RULES",
             "mode": "rules-fallback",
