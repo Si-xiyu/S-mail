@@ -60,6 +60,9 @@ public class AuthService {
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BusinessException(401, "Email or password is incorrect");
         }
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(403, "Account is disabled");
+        }
         return toAuthResponse(user);
     }
 

@@ -1,5 +1,6 @@
 package com.smartmail.common.security;
 
+import com.smartmail.common.exception.BusinessException;
 import com.smartmail.user.entity.SysUser;
 import com.smartmail.user.mapper.SysUserMapper;
 import jakarta.servlet.FilterChain;
@@ -31,10 +32,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         try {
             String header = request.getHeader("Authorization");
             if (header != null && header.startsWith("Bearer ")) {
-                Long userId = tokenService.verify(header.substring(7));
-                SysUser user = userMapper.selectById(userId);
-                if (user != null) {
-                    UserContext.set(new CurrentUser(user.getId(), user.getEmail(), user.getUsername()));
+                try {
+                    Long userId = tokenService.verify(header.substring(7));
+                    SysUser user = userMapper.selectById(userId);
+                    if (user != null && "ACTIVE".equals(user.getStatus())) {
+                        UserContext.set(new CurrentUser(user.getId(), user.getEmail(), user.getUsername()));
+                    }
+                } catch (BusinessException ignored) {
+                    // Invalid or expired tokens are handled as an unauthenticated request.
                 }
             }
             chain.doFilter(request, response);

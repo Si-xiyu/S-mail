@@ -10,6 +10,7 @@ import com.smartmail.common.security.UserContext;
 import com.smartmail.mail.dto.MailDetailResponse;
 import com.smartmail.mail.dto.MailSendResponse;
 import com.smartmail.mail.dto.SendMailRequest;
+import com.smartmail.mail.dto.ThreadMessageResponse;
 import com.smartmail.mail.entity.MailMessage;
 import com.smartmail.mail.entity.MailRecipient;
 import com.smartmail.mail.mapper.MailMessageMapper;
@@ -24,9 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -73,10 +76,8 @@ public class MailService {
         message.setContentHtml(request.contentHtml());
         message.setHasAttachment(false);
 
-        // 处理线程关系
         message.setParentMailId(request.parentMailId());
-        Long threadId = request.threadId() != null ? request.threadId() : resolveThreadId(request.subject(), request.parentMailId());
-        message.setThreadId(threadId);
+        message.setThreadId(resolveThreadId(request.parentMailId()));
 
         message.setSentAt(now);
         message.setCreatedAt(now);
@@ -89,21 +90,20 @@ public class MailService {
         }
 
         createMailboxItem(sender.id(), message.getId(), "SENT", true, now);
-        List<String> allRecipients = new ArrayList<>();
-        allRecipients.addAll(request.to());
-        if (request.cc() != null) {
-            allRecipients.addAll(request.cc());
-        }
+        Map<String, String> recipientTypes = new LinkedHashMap<>();
+        addRecipients(recipientTypes, request.to(), "TO");
+        addRecipients(recipientTypes, request.cc(), "CC");
+        addRecipients(recipientTypes, request.bcc(), "BCC");
         List<String> delivered = new ArrayList<>();
         List<String> failed = new ArrayList<>();
-        for (String rawEmail : allRecipients) {
-            String email = rawEmail.trim().toLowerCase();
+        for (Map.Entry<String, String> recipientEntry : recipientTypes.entrySet()) {
+            String email = recipientEntry.getKey();
             SysUser recipientUser = userMapper.findByEmail(email);
             MailRecipient recipient = new MailRecipient();
             recipient.setMailId(message.getId());
             recipient.setRecipientId(recipientUser == null ? null : recipientUser.getId());
             recipient.setRecipientEmail(email);
-            recipient.setRecipientType(request.to().contains(rawEmail) ? "TO" : "CC");
+            recipient.setRecipientType(recipientEntry.getValue());
             recipient.setDeliveryStatus(recipientUser == null ? "FAILED" : "DELIVERED");
             recipient.setCreatedAt(now);
             recipientMapper.insert(recipient);
@@ -125,9 +125,13 @@ public class MailService {
             throw new BusinessException(404, "邮件不存在或无权访问");
         }
         MailMessage message = mailMapper.selectById(mailId);
+        boolean senderView = message.getSenderId().equals(userId);
         List<String> recipients = recipientMapper.selectList(
                 new QueryWrapper<MailRecipient>().eq("mail_id", mailId)
-        ).stream().map(MailRecipient::getRecipientEmail).toList();
+        ).stream()
+                .filter(recipient -> senderView || !"BCC".equals(recipient.getRecipientType()))
+                .map(MailRecipient::getRecipientEmail)
+                .toList();
         List<Map<String, Object>> aiResults = aiResultMapper.listByMailAndUser(mailId, userId)
                 .stream()
                 .map(result -> {
@@ -176,43 +180,23 @@ public class MailService {
     /**
      * 获取邮件所属的线程
      */
-    public List<MailMessage> getThread(Long mailId) {
-        MailMessage mail = mailMapper.selectById(mailId);
-        if (mail == null) {
-            throw new BusinessException(404, "邮件不存在");
+    @Transactional(readOnly = true)
+    public List<ThreadMessageResponse> getThread(Long mailId) {
+        Long userId = UserContext.requireUserId();
+        MailMessage requested = requireVisibleMessage(mailId, userId);
+        Long rootId = requested.getThreadId() != null ? requested.getThreadId() : requested.getId();
+
+        List<MailMessage> thread = new ArrayList<>(mailMapper.findByThreadId(rootId));
+        MailMessage root = mailMapper.selectById(rootId);
+        if (root != null && thread.stream().noneMatch(message -> message.getId().equals(rootId))) {
+            thread.add(root);
         }
 
-        List<MailMessage> thread = new ArrayList<>();
-
-        // 如果邮件有 threadId，获取该线程的所有邮件
-        if (mail.getThreadId() != null) {
-            thread = mailMapper.findByThreadId(mail.getThreadId());
-        } else if (mail.getParentMailId() != null) {
-            // 如果邮件有 parentMailId，向上回溯找到线程起点
-            MailMessage current = mail;
-            while (current.getParentMailId() != null) {
-                MailMessage parent = mailMapper.selectById(current.getParentMailId());
-                if (parent == null) break;
-                current = parent;
-            }
-
-            // 如果找到了线程起点且它有 threadId，获取整个线程
-            if (current.getThreadId() != null) {
-                thread = mailMapper.findByThreadId(current.getThreadId());
-            } else {
-                // 否则逐个查找该邮件的所有回复
-                thread.add(current);
-                addReplies(current.getId(), thread);
-            }
-        } else {
-            // 如果没有 threadId 或 parentMailId，可能是新线程的起点
-            thread.add(mail);
-            addReplies(mail.getId(), thread);
-        }
-
-        // 按发送时间排序
-        thread.sort((a, b) -> a.getSentAt().compareTo(b.getSentAt()));
-        return thread;
+        return thread.stream()
+                .filter(message -> mailboxMapper.findVisibleByUserAndMail(userId, message.getId()) != null)
+                .sorted((left, right) -> left.getSentAt().compareTo(right.getSentAt()))
+                .map(this::toThreadResponse)
+                .toList();
     }
 
     /**
@@ -222,71 +206,75 @@ public class MailService {
      * 通过回溯 parentMailId 获取从链起点到当前邮件的所有邮件
      */
     @Transactional(readOnly = true)
-    public List<MailMessage> getMailPath(Long mailId) {
-        MailMessage mail = mailMapper.selectById(mailId);
-        if (mail == null) {
-            throw new BusinessException(404, "邮件不存在");
-        }
-
-        List<MailMessage> path = new ArrayList<>();
-        MailMessage current = mail;
+    public List<ThreadMessageResponse> getMailPath(Long mailId) {
+        Long userId = UserContext.requireUserId();
+        List<ThreadMessageResponse> path = new ArrayList<>();
+        MailMessage current = requireVisibleMessage(mailId, userId);
+        Set<Long> visited = new HashSet<>();
         int maxDepth = 1000;
-        int depth = 0;
 
-        // 从当前邮件向上回溯到链的起点
         while (current != null) {
-            path.add(current);
-            depth++;
-
-            if (depth > maxDepth) {
+            if (!visited.add(current.getId()) || visited.size() > maxDepth) {
                 throw new BusinessException(500, "邮件链深度超限");
             }
+            path.add(toThreadResponse(current));
 
-            // 如果没有父邮件，说明到达了链的起点
             if (current.getParentMailId() == null) {
                 break;
             }
-
-            // 向上一级
-            current = mailMapper.selectById(current.getParentMailId());
+            current = requireVisibleMessage(current.getParentMailId(), userId);
         }
 
-        // 反转为时间正序：[第一封, ..., 当前]
         Collections.reverse(path);
-
         return path;
     }
 
-    /**
-     * 递归获取邮件的所有回复，添加到 thread 列表
-     */
-    private void addReplies(Long parentMailId, List<MailMessage> thread) {
-        List<MailMessage> replies = mailMapper.findByParentMailId(parentMailId);
-        for (MailMessage reply : replies) {
-            thread.add(reply);
-            addReplies(reply.getId(), thread);
+    private Long resolveThreadId(Long parentMailId) {
+        if (parentMailId == null) {
+            return null;
         }
+        Long userId = UserContext.requireUserId();
+        MailMessage parentMail = requireVisibleMessage(parentMailId, userId);
+        Long threadId = parentMail.getThreadId() != null ? parentMail.getThreadId() : parentMail.getId();
+        if (parentMail.getThreadId() == null) {
+            parentMail.setThreadId(threadId);
+            mailMapper.updateById(parentMail);
+        }
+        return threadId;
     }
 
-    /**
-     * 发送邮件时处理线程
-     */
-    public Long resolveThreadId(String subject, Long parentMailId) {
-        // 如果有 parentMailId，使用其 threadId 或创建新线程
-        if (parentMailId != null) {
-            MailMessage parentMail = mailMapper.selectById(parentMailId);
-            if (parentMail != null) {
-                if (parentMail.getThreadId() != null) {
-                    return parentMail.getThreadId();
-                } else {
-                    // 创建新线程，使用 parentMailId 作为线程起点
-                    return parentMailId;
-                }
-            }
+    private MailMessage requireVisibleMessage(Long mailId, Long userId) {
+        if (mailboxMapper.findVisibleByUserAndMail(userId, mailId) == null) {
+            throw new BusinessException(404, "邮件不存在或无权访问");
         }
+        MailMessage message = mailMapper.selectById(mailId);
+        if (message == null) {
+            throw new BusinessException(404, "邮件不存在或无权访问");
+        }
+        return message;
+    }
 
-        // 如果没有 parentMailId，尝试根据主题查找现有线程
-        // 这里简化处理：不返回 threadId，让邮件成为新的线程起点
-        return null;
+    private ThreadMessageResponse toThreadResponse(MailMessage message) {
+        return new ThreadMessageResponse(
+                message.getId(),
+                message.getSenderEmail(),
+                message.getSubject(),
+                message.getContentText(),
+                message.getSentAt(),
+                message.getParentMailId(),
+                message.getThreadId()
+        );
+    }
+
+    private void addRecipients(Map<String, String> recipients, List<String> emails, String type) {
+        if (emails == null) {
+            return;
+        }
+        for (String rawEmail : emails) {
+            if (rawEmail == null || rawEmail.isBlank()) {
+                continue;
+            }
+            recipients.putIfAbsent(rawEmail.trim().toLowerCase(), type);
+        }
     }
 }

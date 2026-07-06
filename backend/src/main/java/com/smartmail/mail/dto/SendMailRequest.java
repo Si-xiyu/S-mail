@@ -8,11 +8,11 @@ import java.util.List;
 public record SendMailRequest(
         @NotEmpty List<String> to,
         List<String> cc,
+        List<String> bcc,
         @NotBlank String subject,
         @NotBlank String contentText,
         String contentHtml,
         List<Long> pendingAttachmentIds,
-        Long parentMailId,
-        Long threadId
+        Long parentMailId
 ) {
 }

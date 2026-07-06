@@ -4,7 +4,7 @@ import com.smartmail.common.response.ApiResponse;
 import com.smartmail.mail.dto.MailDetailResponse;
 import com.smartmail.mail.dto.MailSendResponse;
 import com.smartmail.mail.dto.SendMailRequest;
-import com.smartmail.mail.entity.MailMessage;
+import com.smartmail.mail.dto.ThreadMessageResponse;
 import com.smartmail.mail.service.MailService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,12 +41,12 @@ public class MailController {
     }
 
     @GetMapping("/{mailId}/thread")
-    public ApiResponse<List<MailMessage>> getThread(@PathVariable Long mailId) {
+    public ApiResponse<List<ThreadMessageResponse>> getThread(@PathVariable Long mailId) {
         return ApiResponse.ok(mailService.getThread(mailId));
     }
 
     @GetMapping("/{mailId}/path")
-    public ApiResponse<List<MailMessage>> getMailPath(@PathVariable Long mailId) {
+    public ApiResponse<List<ThreadMessageResponse>> getMailPath(@PathVariable Long mailId) {
         return ApiResponse.ok(mailService.getMailPath(mailId));
     }
 }
