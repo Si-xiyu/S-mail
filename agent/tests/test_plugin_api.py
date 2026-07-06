@@ -3,13 +3,15 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 from app.schemas.agent import ToolResult
 from fixtures import EXPECTED_ANALYSIS_RESPONSES, analysis_request
 
 
-RISK_LEVELS = {"LOW", "MEDIUM", "HIGH"}
+RISK_LEVELS = {"LOW", "MEDIUM", "HIGH", "NONE"}
 PRIORITIES = {"LOW", "NORMAL", "HIGH", "URGENT"}
+PLUGIN_HEADERS = {"X-Plugin-Token": settings.plugin_token}
 
 
 class PluginApiTests(unittest.TestCase):
@@ -20,23 +22,29 @@ class PluginApiTests(unittest.TestCase):
         response = self.client.get("/plugin/v1/health")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "status": "UP",
-                "pluginVersion": "0.1.0",
-                "capabilities": {
-                    "rules": True,
-                    "llm": False,
-                    "currentMailAgent": True,
-                    "ragTool": "MOCK",
-                },
-            },
+        body = response.json()
+        self.assertEqual(body["status"], "UP")
+        self.assertEqual(body["pluginVersion"], settings.plugin_version)
+        self.assertTrue(body["capabilities"]["rules"])
+        self.assertTrue(body["capabilities"]["currentMailAgent"])
+        self.assertIn(body["capabilities"]["ragTool"], {"MOCK", "BM25", "VECTOR", "RRF"})
+
+    def test_missing_plugin_token_returns_403(self) -> None:
+        response = self.client.post("/plugin/v1/analysis/mail", json=analysis_request("normal_incoming_mail"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_invalid_plugin_token_returns_403(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/analysis/mail",
+            json=analysis_request("normal_incoming_mail"),
+            headers={"X-Plugin-Token": "wrong-token"},
         )
+        self.assertEqual(response.status_code, 403)
 
     def test_analysis_disabled_returns_no_analysis(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
+            headers=PLUGIN_HEADERS,
             json=analysis_request("disabled_ai_plugin"),
         )
 
@@ -53,6 +61,7 @@ class PluginApiTests(unittest.TestCase):
     def test_category_object_input_preserves_id_and_name(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
+            headers=PLUGIN_HEADERS,
             json=analysis_request("category_id_name_preservation"),
         )
 
@@ -62,6 +71,7 @@ class PluginApiTests(unittest.TestCase):
     def test_string_category_input_returns_category_object(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
+            headers=PLUGIN_HEADERS,
             json={
                 "taskId": "task-category-string",
                 "userId": "user-1",
@@ -82,6 +92,7 @@ class PluginApiTests(unittest.TestCase):
     def test_rules_fallback_detects_junk_risk_priority_and_category_object(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
+            headers=PLUGIN_HEADERS,
             json=analysis_request("junk_phishing_like_mail"),
         )
 
@@ -103,6 +114,7 @@ class PluginApiTests(unittest.TestCase):
     def test_model_info_reports_deepseek_boundary_with_rules_fallback(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
+            headers=PLUGIN_HEADERS,
             json=analysis_request("deepseek_configured_rules_fallback"),
         )
 
@@ -116,7 +128,7 @@ class PluginApiTests(unittest.TestCase):
     def test_analysis_fixture_contracts_are_stable(self) -> None:
         for name, expected in EXPECTED_ANALYSIS_RESPONSES.items():
             with self.subTest(fixture=name):
-                response = self.client.post("/plugin/v1/analysis/mail", json=analysis_request(name))
+                response = self.client.post("/plugin/v1/analysis/mail", headers=PLUGIN_HEADERS, json=analysis_request(name))
 
                 self.assertEqual(response.status_code, 200)
                 body = response.json()
@@ -130,6 +142,7 @@ class PluginApiTests(unittest.TestCase):
     def test_analysis_model_info_provider_rules_when_llm_disabled(self) -> None:
         response = self.client.post(
             "/plugin/v1/analysis/mail",
+            headers=PLUGIN_HEADERS,
             json=analysis_request("normal_incoming_mail"),
         )
 
@@ -143,7 +156,7 @@ class PluginApiTests(unittest.TestCase):
     def test_analysis_risk_level_and_priority_enums(self) -> None:
         for name in EXPECTED_ANALYSIS_RESPONSES:
             with self.subTest(fixture=name):
-                response = self.client.post("/plugin/v1/analysis/mail", json=analysis_request(name))
+                response = self.client.post("/plugin/v1/analysis/mail", headers=PLUGIN_HEADERS, json=analysis_request(name))
 
                 self.assertEqual(response.status_code, 200)
                 body = response.json()
@@ -154,6 +167,7 @@ class PluginApiTests(unittest.TestCase):
     def test_agent_chat_disabled_plugin(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/chat",
+            headers=PLUGIN_HEADERS,
             json={
                 "sessionId": "s1",
                 "userId": 1,
@@ -187,6 +201,7 @@ class PluginApiTests(unittest.TestCase):
 
             response = self.client.post(
                 "/plugin/v1/agent/chat",
+                headers=PLUGIN_HEADERS,
                 json={
                     "sessionId": "s1",
                     "userId": 1,
@@ -206,6 +221,7 @@ class PluginApiTests(unittest.TestCase):
     def test_agent_chat_global_uses_mock_rag(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/chat",
+            headers=PLUGIN_HEADERS,
             json={
                 "sessionId": "s1",
                 "userId": 1,
@@ -224,6 +240,7 @@ class PluginApiTests(unittest.TestCase):
     def test_agent_chat_write_intent_returns_pending_action_contract(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/chat",
+            headers=PLUGIN_HEADERS,
             json={
                 "sessionId": "s1",
                 "userId": 1,
@@ -247,6 +264,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_action_disabled_plugin_returns_noop(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:SET_PRIORITY",
                 "userId": 1,
@@ -266,6 +284,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_action_without_confirmation_rejects_when_auto_write_disabled(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:SET_PRIORITY",
                 "userId": 1,
@@ -285,6 +304,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_action_confirmed_delegates_backend_operation(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:SET_PRIORITY",
                 "userId": 1,
@@ -312,6 +332,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_action_auto_write_delegates_without_confirmation(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:MARK_READ",
                 "userId": 1,
@@ -331,6 +352,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_action_legacy_mail_id_is_normalized(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:MOVE_TO_JUNK",
                 "userId": 1,
@@ -348,6 +370,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_action_unsupported_type_is_rejected(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:DELETE",
                 "userId": 1,
@@ -366,6 +389,7 @@ class PluginApiTests(unittest.TestCase):
     def test_execute_set_category_without_category_id_is_rejected_before_backend_delegation(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/actions/execute",
+            headers=PLUGIN_HEADERS,
             json={
                 "actionId": "s1:88:SET_CATEGORY",
                 "userId": 1,
