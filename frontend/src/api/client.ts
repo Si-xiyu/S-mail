@@ -1,6 +1,17 @@
 import axios, { AxiosError } from 'axios'
 import type { AgentTaskResponse, MailDetail, MailboxItem, SendMailPayload, UserProfile, MailSendResponse } from '../types/mail'
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly code?: number
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 // ============ HTTP 客户端配置 ============
 const http = axios.create({
   baseURL: '/api/v1',
@@ -22,17 +33,17 @@ http.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('smartmail_token')
+      localStorage.removeItem('smartmail_user')
+      window.dispatchEvent(new CustomEvent('smartmail:unauthorized'))
     }
 
     // 尝试从响应数据中获取错误信息
-    const errorData = error.response?.data as any
+    const errorData = error.response?.data as { code?: number; message?: string } | undefined
     if (errorData?.message) {
-      // 如果后端返回了 message，使用它
-      const customError = new Error(errorData.message)
-      throw customError
+      throw new ApiError(errorData.message, error.response?.status, errorData.code)
     }
 
-    throw error
+    throw new ApiError(error.message, error.response?.status)
   }
 )
 
@@ -99,6 +110,14 @@ export async function register(email: string, username: string, password: string
     email: data.data.email,
     username: data.data.username
   }
+}
+
+export async function getCurrentUser(): Promise<UserProfile> {
+  const { data } = await http.get<ApiResponse<UserProfile>>('/users/me')
+  if (data.code !== 0) {
+    throw new ApiError(data.message || '获取用户信息失败', undefined, data.code)
+  }
+  return data.data
 }
 
 // ============ 邮箱 API ============

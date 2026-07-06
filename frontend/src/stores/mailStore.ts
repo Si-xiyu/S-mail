@@ -133,32 +133,53 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 初始化用户状态（从 localStorage 恢复）
    */
-  const initializeUser = async (): Promise<void> => {
+  const initializeUser = async (): Promise<boolean> => {
     const token = localStorage.getItem('smartmail_token')
-    if (token) {
-      const userStr = localStorage.getItem('smartmail_user')
-      if (userStr) {
+    if (!token) {
+      user.value = null
+      return false
+    }
+
+    try {
+      const profile = await apiClient.getCurrentUser()
+      user.value = {
+        id: profile.id.toString(),
+        email: profile.email,
+        name: profile.username
+      }
+      localStorage.setItem('smartmail_user', JSON.stringify(user.value))
+      await Promise.all([loadMailbox('INBOX', 1, 20, true), initializeCategories()])
+      return true
+    } catch (err) {
+      console.error('Failed to restore authenticated session:', err)
+      if (err instanceof apiClient.ApiError && err.status === 401) {
+        logout()
+        return false
+      }
+
+      const cachedUser = localStorage.getItem('smartmail_user')
+      if (cachedUser) {
         try {
-          user.value = JSON.parse(userStr)
-          // 只在用户成功恢复后才尝试加载分类
-          try {
-            await initializeCategories()
-          } catch (err) {
-            // 如果加载分类失败（可能是 token 过期），静默失败
-            console.debug('Failed to initialize categories during startup:', err)
-          }
-        } catch (err) {
-          console.error('Failed to restore user from localStorage:', err)
+          user.value = JSON.parse(cachedUser)
+          error.value = '暂时无法连接服务器，请稍后刷新重试'
+          return true
+        } catch {
           user.value = null
         }
       }
+      return false
     }
   }
 
   /**
    * 加载邮箱列表
    */
-  const loadMailbox = async (folder: string = 'INBOX', page: number = 1, pageSize: number = 20): Promise<void> => {
+  const loadMailbox = async (
+    folder: string = 'INBOX',
+    page: number = 1,
+    pageSize: number = 20,
+    propagateError: boolean = false
+  ): Promise<void> => {
     isLoading.value = true
     error.value = null
     try {
@@ -173,6 +194,9 @@ export const useMailStore = defineStore('mail', () => {
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载邮箱失败'
+      if (propagateError) {
+        throw err
+      }
     } finally {
       isLoading.value = false
     }

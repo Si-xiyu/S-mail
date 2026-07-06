@@ -40,13 +40,22 @@ const router = createRouter({
 
 // 路由守卫：认证检查
 router.beforeEach(
-  (to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
+  async (to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
     const mailStore = useMailStore()
-    const token = localStorage.getItem('smartmail_token')
+    let token = localStorage.getItem('smartmail_token')
+
+    if (!token && mailStore.user) {
+      mailStore.logout()
+    }
 
     // 初始化用户信息
     if (token && !mailStore.user) {
-      mailStore.initializeUser()
+      const restored = await mailStore.initializeUser()
+      if (!restored && to.path.startsWith('/mail')) {
+        next('/auth/login')
+        return
+      }
+      token = localStorage.getItem('smartmail_token')
     }
 
     // 访问认证页面时，如果已登录则重定向到邮件应用
@@ -57,6 +66,7 @@ router.beforeEach(
 
     // 访问邮件应用时，如果未登录则重定向到登录页面
     if (to.path.startsWith('/mail') && !token) {
+      mailStore.logout()
       next('/auth/login')
       return
     }

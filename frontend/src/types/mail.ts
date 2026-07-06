@@ -3,6 +3,13 @@ export interface UserProfile {
   id: number
   email: string
   username: string
+  status?: string
+  settings?: UserSettings
+}
+
+export interface UserSettings {
+  aiEnabled: boolean
+  agentAutoWriteEnabled: boolean
 }
 
 // ============ Mailbox Items ============

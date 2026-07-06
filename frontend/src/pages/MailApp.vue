@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onBeforeUnmount, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import Sidebar from '../components/Sidebar.vue'
 import MailList from '../components/MailList.vue'
@@ -14,14 +15,24 @@ enum PageMode {
 }
 
 const mailStore = useMailStore()
+const router = useRouter()
 const pageMode = ref<PageMode>(PageMode.LIST)
 const selectedMailId = ref<string | null>(null)
 const showCompose = ref(false)
 
 // 初始化用户信息
 onMounted(() => {
-  mailStore.initializeUser()
+  window.addEventListener('smartmail:unauthorized', handleUnauthorized)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('smartmail:unauthorized', handleUnauthorized)
+})
+
+const handleUnauthorized = () => {
+  mailStore.logout()
+  router.replace('/auth/login')
+}
 
 const handleSelectMail = (mailId: string) => {
   selectedMailId.value = mailId

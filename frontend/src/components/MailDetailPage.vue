@@ -232,9 +232,9 @@ const handleAddToLabel = async (labelId: string) => {
         >
           <div class="thread-message-header">
             <div class="thread-message-sender">
-              <span class="sender-avatar">{{ (threadMail.senderName || threadMail.senderEmail).charAt(0).toUpperCase() }}</span>
+              <span class="sender-avatar">{{ threadMail.senderEmail.charAt(0).toUpperCase() }}</span>
               <div class="sender-info-text">
-                <span class="sender-name">{{ threadMail.senderName || threadMail.senderEmail }}</span>
+                <span class="sender-name">{{ threadMail.senderEmail }}</span>
                 <span class="sender-email">{{ threadMail.senderEmail }}</span>
               </div>
             </div>
