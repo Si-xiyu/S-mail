@@ -37,17 +37,17 @@ public class SearchService {
         List<SearchResultResponse> records = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             records.add(new SearchResultResponse(
-                    toLong(row.get("ID")),
-                    toLong(row.get("MAIL_ID")),
-                    (String) row.get("SENDER_EMAIL"),
-                    (String) row.get("SUBJECT"),
-                    snippet((String) row.get("CONTENT_TEXT"), keyword == null ? "" : keyword),
-                    (String) row.get("FOLDER"),
-                    toBoolean(row.get("READ_FLAG")),
-                    toBoolean(row.get("STAR_FLAG")),
-                    (String) row.get("PRIORITY"),
-                    toBoolean(row.get("HAS_ATTACHMENT")),
-                    toLocalDateTime(row.get("RECEIVED_AT"))
+                    toLong(column(row, "ID")),
+                    toLong(column(row, "MAIL_ID")),
+                    (String) column(row, "SENDER_EMAIL"),
+                    (String) column(row, "SUBJECT"),
+                    snippet((String) column(row, "CONTENT_TEXT"), keyword == null ? "" : keyword),
+                    (String) column(row, "FOLDER"),
+                    toBoolean(column(row, "READ_FLAG")),
+                    toBoolean(column(row, "STAR_FLAG")),
+                    (String) column(row, "PRIORITY"),
+                    toBoolean(column(row, "HAS_ATTACHMENT")),
+                    toLocalDateTime(column(row, "RECEIVED_AT"))
             ));
         }
         return new PageResponse<>(records, total, safePage, safeSize);
@@ -75,6 +75,18 @@ public class SearchService {
         if (val == null) return null;
         if (val instanceof Long) return (Long) val;
         return ((Number) val).longValue();
+    }
+
+    private Object column(Map<String, Object> row, String name) {
+        if (row.containsKey(name)) {
+            return row.get(name);
+        }
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(name)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private Boolean toBoolean(Object val) {
