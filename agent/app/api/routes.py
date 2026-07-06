@@ -17,13 +17,23 @@ from app.schemas.plugin import (
 )
 from app.services.agent_loop import SmartMailAgent
 from app.services.analysis_provider import RulesAnalysisProvider
+from app.services.deepseek_analysis_provider import DeepSeekAnalysisProvider
 from app.services.tool_router import ToolRouter
 
 router = APIRouter()
 plugin_router = APIRouter(prefix="/plugin/v1/agent", tags=["agent-plugin"])
 agent = SmartMailAgent()
-analysis_provider = RulesAnalysisProvider()
+rules_analysis_provider = RulesAnalysisProvider()
+deepseek_analysis_provider = DeepSeekAnalysisProvider()
 tool_router = ToolRouter()
+
+
+def _select_analysis_provider(request: AnalysisRequest) -> RulesAnalysisProvider | DeepSeekAnalysisProvider:
+    provider = str(request.plugin_config.provider or settings.provider or "RULES").upper()
+    llm_enabled = bool(request.plugin_config.llm_enabled and request.plugin_config.api_key)
+    if provider == "DEEPSEEK" or llm_enabled:
+        return deepseek_analysis_provider
+    return rules_analysis_provider
 
 
 def verify_plugin_token(x_plugin_token: str | None = Header(default=None, alias="X-Plugin-Token")) -> None:
@@ -55,7 +65,8 @@ def plugin_health() -> PluginHealthResponse:
     dependencies=[Depends(verify_plugin_token)],
 )
 def analyze_mail(request: AnalysisRequest) -> AnalysisResponse:
-    model_info = analysis_provider.model_info(request)
+    provider = _select_analysis_provider(request)
+    model_info = provider.model_info(request)
     if not request.plugin_config.ai_plugin_enabled:
         return AnalysisResponse(
             status="DISABLED",
@@ -69,7 +80,7 @@ def analyze_mail(request: AnalysisRequest) -> AnalysisResponse:
             modelInfo=model_info,
         )
 
-    return analysis_provider.analyze(request)
+    return provider.analyze(request)
 
 
 @router.post("/api/v1/agent/tasks", response_model=AgentTaskResponse, tags=["agent"])

@@ -86,6 +86,7 @@ class PluginConfig(BaseModel):
     ai_plugin_enabled: bool = Field(default=True, alias="aiPluginEnabled")
     llm_enabled: bool = Field(default=False, alias="llmEnabled")
     api_key: str | None = Field(default=None, alias="apiKey")
+    provider: str | None = Field(default=None, alias="provider")
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
