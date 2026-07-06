@@ -372,32 +372,6 @@ export const useMailStore = defineStore('mail', () => {
   }
 
   /**
-   * 实时计算某个标签的未读邮件数
-   */
-  const getUnreadCount = (labelId: string): number => {
-    if (labelId === 'STARRED') {
-      // 标星邮件：统计所有已标星且未读的邮件
-      return mailboxItems.value.filter(item => item.starred && !item.read).length
-    }
-    if (labelId === 'INBOX' || labelId === 'SENT' || labelId === 'TRASH') {
-      // 标准文件夹：统计该文件夹中未读的邮件
-      // 仅在当前标签为该文件夹时才能准确统计（因为 mailboxItems 只加载当前文件夹的邮件）
-      if (currentLabel.value === labelId) {
-        return mailboxItems.value.filter(item => !item.read).length
-      }
-      // 如果切换到其他标签，返回 label.count 中的值
-      const label = labels.value.find(l => l.id === labelId)
-      return label?.count ?? 0
-    }
-    // 自定义分类：统计该分类中未读的邮件
-    if (currentLabel.value === labelId) {
-      return mailboxItems.value.filter(item => !item.read).length
-    }
-    const label = labels.value.find(l => l.id === labelId)
-    return label?.count ?? 0
-  }
-
-  /**
    * 标记邮件为已读/未读
    */
   const markMailRead = async (itemId: number, read: boolean): Promise<void> => {
@@ -773,7 +747,6 @@ export const useMailStore = defineStore('mail', () => {
     refreshCurrent,
     applyNotificationCounts,
     refreshDraftCount,
-    getUnreadCount,
     markMailRead,
     starMail,
     deleteMail: deleteMailCompat,
