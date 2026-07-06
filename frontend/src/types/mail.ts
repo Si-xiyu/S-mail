@@ -35,11 +35,19 @@ export interface MailboxItem {
  * 邮件详情 - 对应后端 MailDetailResponse
  * 包含完整的邮件内容和附件信息
  */
-export interface MailDetail extends MailboxItem {
+export interface MailDetail {
+  mailId: number
+  itemId: number
   messageNo: string
+  senderEmail: string
+  subject: string
   contentText: string
-  contentHtml?: string
-  sentAt?: string // ISO 8601 format，邮件发送时间
+  contentHtml: string | null
+  folder: string
+  read: boolean
+  starred: boolean
+  priority: string
+  sentAt: string
   recipients: string[]
   attachments: Attachment[]
   aiResults: Array<Record<string, unknown>>
@@ -53,6 +61,25 @@ export interface Attachment {
   fileName: string
   mimeType: string
   fileSize: number
+  downloadUrl: string
+}
+
+export interface PendingAttachment {
+  pendingAttachmentId: number
+  fileName: string
+  mimeType: string
+  fileSize: number
+  status: string
+}
+
+export interface ThreadMessage {
+  mailId: number
+  senderEmail: string
+  subject: string
+  contentText: string
+  sentAt: string
+  parentMailId: number | null
+  threadId: number | null
 }
 
 // ============ Send Mail ============
@@ -68,7 +95,6 @@ export interface SendMailPayload {
   contentHtml?: string
   pendingAttachmentIds?: number[]
   parentMailId?: number
-  threadId?: number
 }
 
 /**

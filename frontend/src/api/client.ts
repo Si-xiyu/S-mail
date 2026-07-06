@@ -1,5 +1,14 @@
 import axios, { AxiosError } from 'axios'
-import type { AgentTaskResponse, MailDetail, MailboxItem, SendMailPayload, UserProfile, MailSendResponse } from '../types/mail'
+import type {
+  AgentTaskResponse,
+  MailDetail,
+  MailboxItem,
+  MailSendResponse,
+  PendingAttachment,
+  SendMailPayload,
+  ThreadMessage,
+  UserProfile
+} from '../types/mail'
 
 export class ApiError extends Error {
   constructor(
@@ -54,7 +63,7 @@ interface ApiResponse<T> {
   data: T
 }
 
-interface PageResponse<T> {
+export interface PageResponse<T> {
   records: T[]
   total: number
   page: number
@@ -132,7 +141,7 @@ export async function listMailbox(
   folder: string = 'INBOX',
   page: number = 1,
   pageSize: number = 20
-): Promise<MailboxItem[]> {
+): Promise<PageResponse<MailboxItem>> {
   const { data } = await http.get<ApiResponse<PageResponse<MailboxItem>>>('/mailbox', {
     params: { folder, page, pageSize }
   })
@@ -141,7 +150,10 @@ export async function listMailbox(
     throw new Error(data.message)
   }
 
-  return data.data.records || []
+  return {
+    ...data.data,
+    records: data.data.records || []
+  }
 }
 
 /**
@@ -165,7 +177,7 @@ export async function getMailDetail(mailId: number): Promise<MailDetail> {
  * @returns 邮件发送响应（包含 mailId 和 messageNo）
  */
 export async function sendMail(payload: SendMailPayload): Promise<MailSendResponse> {
-  const { data } = await http.post<ApiResponse<MailSendResponse>>('/mails', payload)
+  const { data } = await http.post<ApiResponse<MailSendResponse>>('/mails/send', payload)
 
   if (data.code !== 0) {
     throw new Error(data.message)
@@ -229,8 +241,8 @@ export async function moveMail(itemId: number, folder: string): Promise<void> {
 /**
  * 获取邮件线程（会话）
  */
-export async function getMailThread(mailId: number): Promise<MailDetail[]> {
-  const { data } = await http.get<ApiResponse<MailDetail[]>>(`/mails/${mailId}/thread`)
+export async function getMailThread(mailId: number): Promise<ThreadMessage[]> {
+  const { data } = await http.get<ApiResponse<ThreadMessage[]>>(`/mails/${mailId}/thread`)
 
   if (data.code !== 0) {
     throw new Error(data.message)
@@ -242,8 +254,8 @@ export async function getMailThread(mailId: number): Promise<MailDetail[]> {
 /**
  * 获取邮件的对话路径（从起点到当前邮件）
  */
-export async function getMailPath(mailId: number): Promise<MailDetail[]> {
-  const { data } = await http.get<ApiResponse<MailDetail[]>>(`/mails/${mailId}/path`)
+export async function getMailPath(mailId: number): Promise<ThreadMessage[]> {
+  const { data } = await http.get<ApiResponse<ThreadMessage[]>>(`/mails/${mailId}/path`)
 
   if (data.code !== 0) {
     throw new Error(data.message)
@@ -252,13 +264,62 @@ export async function getMailPath(mailId: number): Promise<MailDetail[]> {
   return data.data || []
 }
 
+export async function searchMailbox(
+  keyword: string,
+  folder?: string,
+  categoryId?: number,
+  starred?: boolean,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PageResponse<MailboxItem>> {
+  const { data } = await http.get<ApiResponse<PageResponse<Omit<MailboxItem, 'preview'> & { snippet: string }>>>('/mailbox/search', {
+    params: { keyword, folder: folder || undefined, categoryId, starred, page, pageSize }
+  })
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+  return {
+    ...data.data,
+    records: (data.data.records || []).map(record => ({
+      ...record,
+      preview: record.snippet
+    }))
+  }
+}
+
+export async function uploadPendingAttachment(file: File): Promise<PendingAttachment> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await http.post<ApiResponse<PendingAttachment>>('/compose/attachments', form)
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+  return data.data
+}
+
+export async function removePendingAttachment(pendingAttachmentId: number): Promise<void> {
+  const { data } = await http.delete<ApiResponse<void>>(`/compose/attachments/${pendingAttachmentId}`)
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+}
+
+export async function downloadAttachment(attachmentId: number, fileName: string): Promise<void> {
+  const response = await http.get<Blob>(`/attachments/${attachmentId}/download`, { responseType: 'blob' })
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 // ============ 分类 API ============
 interface CategoryResponse {
   id: number
   name: string
   color: string
   sortOrder: number
-  createdAt: string
 }
 
 /**

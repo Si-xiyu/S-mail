@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import { useMailStore } from '../stores/mailStore'
 import { ref, onMounted, onUnmounted } from 'vue'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const mailStore = useMailStore()
@@ -9,8 +10,17 @@ const searchQuery = ref('')
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLDivElement | null>(null)
 
-const handleSearch = () => {
-  console.log('Search for:', searchQuery.value)
+const handleSearch = async () => {
+  try {
+    await mailStore.searchMailbox(searchQuery.value)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '搜索失败')
+  }
+}
+
+const clearSearch = async () => {
+  searchQuery.value = ''
+  await mailStore.searchMailbox('')
 }
 
 const handleLogout = () => {
@@ -63,7 +73,9 @@ onUnmounted(() => {
           type="text"
           placeholder="Search mail"
           @keyup.enter="handleSearch"
+          @keyup.esc="clearSearch"
         />
+        <button v-if="searchQuery" class="clear-search" type="button" @click="clearSearch">✕</button>
       </div>
     </div>
 
@@ -153,6 +165,8 @@ onUnmounted(() => {
 .search-box input::placeholder {
   color: #9ca3af;
 }
+
+.clear-search { border: 0; color: #6b7280; background: transparent; cursor: pointer; }
 
 .topbar-right {
   display: flex;

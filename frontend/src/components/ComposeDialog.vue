@@ -1,273 +1,187 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { reactive, ref, watch } from 'vue'
+import * as apiClient from '../api/client'
 import { useMailStore } from '../stores/mailStore'
+import type { PendingAttachment } from '../types/mail'
 
-const props = withDefaults(defineProps<{
-  modelValue: boolean
-}>(), {
-  modelValue: false
-})
-
-const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-}>()
-
+const props = withDefaults(defineProps<{ modelValue: boolean }>(), { modelValue: false })
+const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const mailStore = useMailStore()
 
-const form = reactive({
-  to: '',
-  subject: '',
-  content: ''
-})
-
+const form = reactive({ to: '', cc: '', bcc: '', subject: '', content: '' })
+const attachments = ref<PendingAttachment[]>([])
 const isMinimized = ref(false)
+const sending = ref(false)
+const uploading = ref(false)
+let saveTimer: number | undefined
+
+const draftKey = () => `smartmail_draft_${mailStore.user?.id || 'anonymous'}`
+const addresses = (value: string) => value.split(',').map(item => item.trim()).filter(Boolean)
+
+const saveDraft = () => {
+  window.clearTimeout(saveTimer)
+  saveTimer = window.setTimeout(() => {
+    const hasContent = Object.values(form).some(value => value.trim()) || attachments.value.length > 0
+    if (hasContent) {
+      localStorage.setItem(draftKey(), JSON.stringify({ ...form, attachments: attachments.value }))
+    } else {
+      localStorage.removeItem(draftKey())
+    }
+  }, 250)
+}
+
+const restoreDraft = () => {
+  const raw = localStorage.getItem(draftKey())
+  if (!raw) return
+  try {
+    const draft = JSON.parse(raw)
+    form.to = draft.to || ''
+    form.cc = draft.cc || ''
+    form.bcc = draft.bcc || ''
+    form.subject = draft.subject || ''
+    form.content = draft.content || ''
+    attachments.value = Array.isArray(draft.attachments) ? draft.attachments : []
+  } catch {
+    localStorage.removeItem(draftKey())
+  }
+}
+
+watch(() => props.modelValue, open => {
+  if (open) restoreDraft()
+})
+watch(form, saveDraft, { deep: true })
+watch(attachments, saveDraft, { deep: true })
+
+const handleFiles = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  if (!files.length) return
+  uploading.value = true
+  try {
+    for (const file of files) {
+      attachments.value.push(await apiClient.uploadPendingAttachment(file))
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '附件上传失败')
+  } finally {
+    uploading.value = false
+    input.value = ''
+  }
+}
+
+const removeAttachment = async (attachment: PendingAttachment) => {
+  try {
+    await apiClient.removePendingAttachment(attachment.pendingAttachmentId)
+    attachments.value = attachments.value.filter(item => item.pendingAttachmentId !== attachment.pendingAttachmentId)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '附件移除失败')
+  }
+}
+
+const clearDraft = () => {
+  Object.assign(form, { to: '', cc: '', bcc: '', subject: '', content: '' })
+  attachments.value = []
+  localStorage.removeItem(draftKey())
+}
 
 const handleSend = async () => {
-  if (!form.to || !form.subject) {
-    alert('Please fill in recipient and subject')
+  const to = addresses(form.to)
+  if (!to.length || !form.subject.trim() || !form.content.trim()) {
+    ElMessage.warning('请填写收件人、主题和正文')
     return
   }
-
-  const toList = form.to.split(',').map(e => e.trim()).filter(Boolean)
-
+  sending.value = true
   try {
-    await mailStore.sendMail(toList, form.subject, form.content)
-
-    // Reset form
-    form.to = ''
-    form.subject = ''
-    form.content = ''
-
+    const result = await mailStore.sendMessage({
+      to,
+      cc: addresses(form.cc),
+      bcc: addresses(form.bcc),
+      subject: form.subject.trim(),
+      contentText: form.content,
+      pendingAttachmentIds: attachments.value.map(item => item.pendingAttachmentId)
+    })
+    if (result.delivery.failed.length) {
+      ElMessage.warning(`邮件已发送，但以下地址投递失败：${result.delivery.failed.join(', ')}`)
+    } else {
+      ElMessage.success('邮件发送成功')
+    }
+    clearDraft()
     emit('update:modelValue', false)
-  } catch (err) {
-    alert('Failed to send email: ' + (err instanceof Error ? err.message : 'Unknown error'))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '邮件发送失败')
+  } finally {
+    sending.value = false
   }
 }
 
-const handleClose = () => {
+const discardDraft = async () => {
+  await Promise.allSettled(attachments.value.map(item =>
+    apiClient.removePendingAttachment(item.pendingAttachmentId)
+  ))
+  clearDraft()
   emit('update:modelValue', false)
-}
-
-const handleMinimize = () => {
-  isMinimized.value = !isMinimized.value
 }
 </script>
 
 <template>
   <transition name="compose">
-    <div v-if="modelValue" class="compose-dialog" :class="{ minimized: isMinimized }">
-      <div class="compose-header">
-        <div class="header-title">New Message</div>
-        <div class="header-actions">
-          <button class="icon-btn" @click="handleMinimize">
-            {{ isMinimized ? '▲' : '▼' }}
-          </button>
-          <button class="icon-btn" @click="handleClose">✕</button>
+    <section v-if="modelValue" class="compose-dialog" :class="{ minimized: isMinimized }">
+      <header class="compose-header">
+        <strong>新邮件</strong>
+        <div>
+          <button type="button" class="icon-btn" @click="isMinimized = !isMinimized">{{ isMinimized ? '▲' : '▼' }}</button>
+          <button type="button" class="icon-btn" title="保存并关闭" @click="emit('update:modelValue', false)">✕</button>
         </div>
-      </div>
-
+      </header>
       <div v-if="!isMinimized" class="compose-body">
-        <div class="form-group">
-          <input
-            v-model="form.to"
-            type="email"
-            class="form-input"
-            placeholder="To"
-            multiple
-          />
+        <input v-model="form.to" class="field" placeholder="收件人，多个地址用逗号分隔" />
+        <input v-model="form.cc" class="field" placeholder="抄送" />
+        <input v-model="form.bcc" class="field" placeholder="密送" />
+        <input v-model="form.subject" class="field" placeholder="主题" />
+        <textarea v-model="form.content" class="content" placeholder="撰写邮件"></textarea>
+
+        <div v-if="attachments.length" class="attachment-list">
+          <div v-for="attachment in attachments" :key="attachment.pendingAttachmentId" class="attachment">
+            <span>{{ attachment.fileName }} · {{ Math.ceil(attachment.fileSize / 1024) }} KB</span>
+            <button type="button" @click="removeAttachment(attachment)">移除</button>
+          </div>
         </div>
 
-        <div class="form-group">
-          <input
-            v-model="form.subject"
-            type="text"
-            class="form-input"
-            placeholder="Subject"
-          />
-        </div>
-
-        <div class="form-group">
-          <textarea
-            v-model="form.content"
-            class="form-textarea"
-            placeholder="Compose your message..."
-          ></textarea>
-        </div>
-
-        <div class="compose-footer">
-          <button class="send-btn" @click="handleSend">Send</button>
-          <button class="btn-icon">
-            <span>📎</span>
+        <footer class="compose-footer">
+          <button type="button" class="send-btn" :disabled="sending || uploading" @click="handleSend">
+            {{ sending ? '发送中…' : '发送' }}
           </button>
-          <button class="btn-icon">
-            <span>😊</span>
-          </button>
-        </div>
+          <label class="attach-btn" :class="{ disabled: uploading }">
+            {{ uploading ? '上传中…' : '📎 添加附件' }}
+            <input type="file" multiple :disabled="uploading" @change="handleFiles" />
+          </label>
+          <button type="button" class="discard-btn" @click="discardDraft">丢弃草稿</button>
+        </footer>
       </div>
-    </div>
+    </section>
   </transition>
 </template>
 
 <style scoped>
-.compose-dialog {
-  position: fixed;
-  bottom: 0;
-  right: 24px;
-  width: 400px;
-  max-width: calc(100% - 48px);
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-bottom: none;
-  border-radius: 8px 8px 0 0;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  z-index: 500;
-  animation: slideUp 0.3s ease-out;
-}
-
-.compose-dialog.minimized {
-  width: auto;
-}
-
-.compose-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
-  cursor: move;
-  user-select: none;
-}
-
-.header-title {
-  font-weight: 500;
-  color: #1f2937;
-  font-size: 14px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #6b7280;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.icon-btn:hover {
-  background: #e5e7eb;
-  color: #1f2937;
-}
-
-.compose-body {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.form-group {
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  border: none;
-  padding: 12px 16px;
-  font-family: inherit;
-  font-size: 14px;
-  color: #1f2937;
-  outline: none;
-  resize: none;
-}
-
-.form-input::placeholder,
-.form-textarea::placeholder {
-  color: #9ca3af;
-}
-
-.form-textarea {
-  min-height: 200px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.compose-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #fafbfc;
-}
-
-.send-btn {
-  padding: 8px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.send-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-}
-
-.btn-icon {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #e5e7eb;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  transition: all 0.2s;
-  margin-left: auto;
-}
-
-.btn-icon:hover {
-  background: #f3f4f6;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.compose-enter-active,
-.compose-leave-active {
-  transition: all 0.3s ease;
-}
-
-.compose-enter-from,
-.compose-leave-to {
-  transform: translateY(100%);
-  opacity: 0;
-}
+.compose-dialog { position: fixed; right: 24px; bottom: 0; z-index: 500; width: 520px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid #dfe3e8; border-bottom: 0; border-radius: 12px 12px 0 0; box-shadow: 0 -8px 30px rgba(15, 23, 42, .16); }
+.compose-dialog.minimized { width: 300px; }
+.compose-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; color: #fff; background: #312e81; border-radius: 11px 11px 0 0; }
+.icon-btn { border: 0; color: inherit; background: transparent; cursor: pointer; }
+.compose-body { display: flex; flex-direction: column; }
+.field { border: 0; border-bottom: 1px solid #e5e7eb; padding: 11px 16px; outline: none; }
+.content { min-height: 220px; padding: 16px; border: 0; resize: vertical; outline: none; font: inherit; }
+.attachment-list { padding: 0 16px 8px; display: grid; gap: 6px; }
+.attachment { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: #f3f4f6; border-radius: 8px; font-size: 13px; }
+.attachment button, .discard-btn { border: 0; background: transparent; color: #dc2626; cursor: pointer; }
+.compose-footer { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e5e7eb; }
+.send-btn { padding: 9px 24px; border: 0; border-radius: 8px; background: #4f46e5; color: #fff; cursor: pointer; }
+.send-btn:disabled { opacity: .55; cursor: wait; }
+.attach-btn { cursor: pointer; color: #4338ca; font-size: 13px; }
+.attach-btn.disabled { opacity: .55; }
+.attach-btn input { display: none; }
+.discard-btn { margin-left: auto; }
+.compose-enter-active, .compose-leave-active { transition: transform .2s ease, opacity .2s ease; }
+.compose-enter-from, .compose-leave-to { transform: translateY(100%); opacity: 0; }
+@media (max-width: 640px) { .compose-dialog { right: 8px; width: calc(100vw - 16px); } }
 </style>

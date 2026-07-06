@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Mail, MailItem, User, Label } from '../types'
-import type { MailboxItem, MailDetail, UserProfile } from '../types/mail'
+import type { MailboxItem, MailDetail, MailSendResponse, SendMailPayload, ThreadMessage, UserProfile } from '../types/mail'
 import * as apiClient from '../api/client'
 
 export const useMailStore = defineStore('mail', () => {
@@ -30,11 +30,15 @@ export const useMailStore = defineStore('mail', () => {
   const mailDetailCache = ref<Map<number, MailDetail>>(new Map())
 
   // 邮件线程缓存
-  const mailThreadCache = ref<Map<number, MailDetail[]>>(new Map())
+  const mailThreadCache = ref<Map<number, ThreadMessage[]>>(new Map())
 
   // 加载状态
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const total = ref(0)
+  const page = ref(1)
+  const pageSize = ref(20)
+  const searchQuery = ref('')
 
   // ============ 计算属性 ============
 
@@ -176,21 +180,24 @@ export const useMailStore = defineStore('mail', () => {
    */
   const loadMailbox = async (
     folder: string = 'INBOX',
-    page: number = 1,
-    pageSize: number = 20,
+    requestedPage: number = 1,
+    requestedPageSize: number = 20,
     propagateError: boolean = false
   ): Promise<void> => {
     isLoading.value = true
     error.value = null
     try {
-      const items = await apiClient.listMailbox(folder, page, pageSize)
-      mailboxItems.value = items
+      const result = await apiClient.listMailbox(folder, requestedPage, requestedPageSize)
+      mailboxItems.value = result.records
+      total.value = result.total
+      pageSize.value = result.pageSize
+      page.value = result.page
       currentLabel.value = folder
 
       // 更新标签计数
       const label = labels.value.find(l => l.id === folder)
       if (label) {
-        label.count = items.length
+        label.count = result.total
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载邮箱失败'
@@ -215,8 +222,8 @@ export const useMailStore = defineStore('mail', () => {
 
       for (const folder of folders) {
         try {
-          const items = await apiClient.listMailbox(folder, 1, 100)
-          const starred = items.filter(item => item.starred)
+          const result = await apiClient.listMailbox(folder, 1, 50)
+          const starred = result.records.filter(item => item.starred)
           allStarred.push(...starred)
         } catch (err) {
           // 如果是认证错误，忽略
@@ -229,6 +236,8 @@ export const useMailStore = defineStore('mail', () => {
       }
 
       mailboxItems.value = allStarred
+      total.value = allStarred.length
+      page.value = 1
       currentLabel.value = 'STARRED'
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载星标邮件失败'
@@ -271,26 +280,70 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 发送邮件
    */
-  const sendMail = async (to: string[], subject: string, contentText: string, cc: string[] = [], contentHtml?: string, parentMailId?: number, threadId?: number): Promise<void> => {
+  const sendMessage = async (payload: SendMailPayload): Promise<MailSendResponse> => {
     isLoading.value = true
     error.value = null
     try {
-      await apiClient.sendMail({
-        to,
-        cc,
-        subject,
-        contentText,
-        contentHtml,
-        parentMailId,
-        threadId
-      })
-      // 发送后重新加载已发送列表
-      await loadMailbox('SENT')
+      const result = await apiClient.sendMail(payload)
+      mailThreadCache.value.clear()
+      mailDetailCache.value.clear()
+      await loadMailbox(currentLabel.value, page.value, pageSize.value)
+      return result
     } catch (err) {
       error.value = err instanceof Error ? err.message : '发送邮件失败'
       throw err
     } finally {
       isLoading.value = false
+    }
+  }
+
+  const sendMail = async (
+    to: string[],
+    subject: string,
+    contentText: string,
+    cc: string[] = [],
+    contentHtml?: string,
+    parentMailId?: number
+  ): Promise<void> => {
+    await sendMessage({ to, cc, subject, contentText, contentHtml, parentMailId })
+  }
+
+  const searchMailbox = async (keyword: string, requestedPage: number = 1): Promise<void> => {
+    const trimmed = keyword.trim()
+    searchQuery.value = trimmed
+    if (!trimmed) {
+      await loadMailbox(currentLabel.value, requestedPage, pageSize.value)
+      return
+    }
+    isLoading.value = true
+    error.value = null
+    try {
+      const folder = /^[A-Z]+$/.test(currentLabel.value) && currentLabel.value !== 'STARRED'
+        ? currentLabel.value
+        : undefined
+      const categoryId = /^\d+$/.test(currentLabel.value) ? Number(currentLabel.value) : undefined
+      const starred = currentLabel.value === 'STARRED' ? true : undefined
+      const result = await apiClient.searchMailbox(
+        trimmed, folder, categoryId, starred, requestedPage, pageSize.value
+      )
+      mailboxItems.value = result.records
+      total.value = result.total
+      page.value = result.page
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '搜索邮件失败'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const refreshCurrent = async (): Promise<void> => {
+    if (searchQuery.value) {
+      await searchMailbox(searchQuery.value, page.value)
+    } else if (currentLabel.value === 'STARRED') {
+      await loadStarredMails()
+    } else {
+      await loadMailbox(currentLabel.value, page.value, pageSize.value)
     }
   }
 
@@ -414,17 +467,17 @@ export const useMailStore = defineStore('mail', () => {
    * 获取邮件线程/会话（兼容方法）
    * 返回整个线程中的所有邮件
    */
-  const getMailThread = async (mailId: number): Promise<MailDetail[]> => {
+  const getMailThread = async (mailId: number, force: boolean = false): Promise<ThreadMessage[]> => {
     // 先检查缓存
     const cached = mailThreadCache.value.get(mailId)
-    if (cached) {
+    if (cached && !force) {
       return cached
     }
 
     isLoading.value = true
     error.value = null
     try {
-      let thread: MailDetail[] = []
+      let thread: ThreadMessage[] = []
 
       // 调用线程 API
       try {
@@ -434,12 +487,20 @@ export const useMailStore = defineStore('mail', () => {
         // 至少返回当前邮件
         const current = await getMailDetail(mailId)
         if (current) {
-          thread = [current]
+          thread = [{
+            mailId: current.mailId,
+            senderEmail: current.senderEmail,
+            subject: current.subject,
+            contentText: current.contentText,
+            sentAt: current.sentAt,
+            parentMailId: null,
+            threadId: null
+          }]
         }
       }
 
       // 按发送时间排序（升序）
-      thread.sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime())
+      thread.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
 
       mailThreadCache.value.set(mailId, thread)
       return thread
@@ -455,17 +516,17 @@ export const useMailStore = defineStore('mail', () => {
    * 获取邮件的对话路径（从起点到当前邮件）
    * 相比 getMailThread，只返回需要显示的对话链
    */
-  const getMailPath = async (mailId: number): Promise<MailDetail[]> => {
+  const getMailPath = async (mailId: number, force: boolean = false): Promise<ThreadMessage[]> => {
     // 先检查缓存
     const cached = mailThreadCache.value.get(mailId)
-    if (cached) {
+    if (cached && !force) {
       return cached
     }
 
     isLoading.value = true
     error.value = null
     try {
-      let path: MailDetail[] = []
+      let path: ThreadMessage[] = []
 
       // 调用对话路径 API
       try {
@@ -475,12 +536,20 @@ export const useMailStore = defineStore('mail', () => {
         // 至少返回当前邮件
         const current = await getMailDetail(mailId)
         if (current) {
-          path = [current]
+          path = [{
+            mailId: current.mailId,
+            senderEmail: current.senderEmail,
+            subject: current.subject,
+            contentText: current.contentText,
+            sentAt: current.sentAt,
+            parentMailId: null,
+            threadId: null
+          }]
         }
       }
 
       // 按发送时间排序（升序）
-      path.sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime())
+      path.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
 
       mailThreadCache.value.set(mailId, path)
       return path
@@ -619,6 +688,10 @@ export const useMailStore = defineStore('mail', () => {
     mailThreadCache,
     isLoading,
     error,
+    total,
+    page,
+    pageSize,
+    searchQuery,
 
     // 计算属性
     currentMailItems,
@@ -635,6 +708,9 @@ export const useMailStore = defineStore('mail', () => {
     getMailThread,
     getMailPath,
     sendMail,
+    sendMessage,
+    searchMailbox,
+    refreshCurrent,
     markMailRead,
     starMail,
     deleteMail: deleteMailCompat,

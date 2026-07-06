@@ -21,6 +21,7 @@ const systemLabels = computed(() => {
 const customLabels = computed(() => {
   return mailStore.labels.filter(l => !SYSTEM_LABEL_IDS.includes(l.id))
 })
+const isProtectedLabel = (name: string) => name === 'Other' || name === 'Junk Mail'
 
 const isActive = (labelId: string) => {
   return mailStore.currentLabel === labelId
@@ -127,7 +128,7 @@ const handleDeleteLabel = async (labelId: string) => {
           <span class="label-name">{{ label.name }}</span>
           <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
           <button
-            v-if="hoveredLabelId === label.id"
+            v-if="hoveredLabelId === label.id && !isProtectedLabel(label.name)"
             class="label-delete-btn"
             @click.stop="handleDeleteLabel(label.id)"
             title="Delete label"

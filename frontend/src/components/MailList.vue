@@ -15,9 +15,17 @@ const handleSelectMail = (mailId: string) => {
   emit('selectMail', mailId)
 }
 
-const getLabelName = (labelId: string) => {
-  const label = mailStore.labels.find(l => l.id === labelId)
-  return label?.name || labelId
+const rangeStart = computed(() => mailStore.total ? (mailStore.page - 1) * mailStore.pageSize + 1 : 0)
+const rangeEnd = computed(() => Math.min(mailStore.page * mailStore.pageSize, mailStore.total))
+const hasPrevious = computed(() => mailStore.page > 1)
+const hasNext = computed(() => mailStore.page * mailStore.pageSize < mailStore.total)
+
+const changePage = async (nextPage: number) => {
+  if (mailStore.searchQuery) {
+    await mailStore.searchMailbox(mailStore.searchQuery, nextPage)
+  } else {
+    await mailStore.loadMailbox(mailStore.currentLabel, nextPage, mailStore.pageSize)
+  }
 }
 
 const formatTime = (timestamp: number) => {
@@ -44,14 +52,22 @@ const formatTime = (timestamp: number) => {
     <div class="list-header">
       <div class="header-left">
         <input type="checkbox" class="checkbox" />
-        <span class="refresh-btn">🔄</span>
+        <button type="button" class="refresh-btn" :disabled="mailStore.isLoading" @click="mailStore.refreshCurrent()">🔄</button>
       </div>
       <div class="header-right">
-        <span class="pagination">1-20 of {{ mailStore.mailItems.length }}</span>
+        <span class="pagination">{{ rangeStart }}-{{ rangeEnd }} / {{ mailStore.total }}</span>
+        <button type="button" :disabled="!hasPrevious" @click="changePage(mailStore.page - 1)">‹</button>
+        <button type="button" :disabled="!hasNext" @click="changePage(mailStore.page + 1)">›</button>
       </div>
     </div>
 
-    <div class="list-container">
+    <div v-if="mailStore.error" class="error-state">
+      <span>{{ mailStore.error }}</span>
+      <button type="button" @click="mailStore.refreshCurrent()">重试</button>
+    </div>
+
+    <div v-if="mailStore.isLoading" class="loading-state">正在加载…</div>
+    <div v-else class="list-container">
       <div
         v-for="item in mailStore.mailItems"
         :key="item.id"
@@ -95,7 +111,7 @@ const formatTime = (timestamp: number) => {
       </div>
     </div>
 
-    <div v-if="mailStore.mailItems.length === 0" class="empty-state">
+    <div v-if="!mailStore.isLoading && mailStore.mailItems.length === 0" class="empty-state">
       <div class="empty-icon">📭</div>
       <p>No emails in this label</p>
     </div>
@@ -127,6 +143,10 @@ const formatTime = (timestamp: number) => {
   gap: 8px;
 }
 
+.header-right { display: flex; align-items: center; gap: 6px; }
+.header-right button { border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
+.header-right button:disabled { opacity: .4; cursor: default; }
+
 .checkbox {
   width: 18px;
   height: 18px;
@@ -134,10 +154,16 @@ const formatTime = (timestamp: number) => {
 }
 
 .refresh-btn {
+  border: 0;
+  background: transparent;
   font-size: 18px;
   cursor: pointer;
   transition: transform 0.2s;
 }
+
+.loading-state, .error-state { padding: 18px; text-align: center; color: #6b7280; }
+.error-state { color: #b91c1c; background: #fef2f2; }
+.error-state button { margin-left: 10px; }
 
 .refresh-btn:hover {
   transform: rotate(180deg);

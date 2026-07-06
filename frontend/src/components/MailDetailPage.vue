@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useMailStore } from '../stores/mailStore'
 import { computed, ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import type { MailDetail } from '../types/mail'
+import type { ThreadMessage } from '../types/mail'
 
 const props = defineProps<{
   mailId?: string | null
@@ -15,7 +15,7 @@ const mailStore = useMailStore()
 const showLabelMenu = ref(false)
 const replyMode = ref<'none' | 'reply' | 'forward'>('none')
 const replyContent = ref('')
-const mailThread = ref<MailDetail[]>([])
+const mailThread = ref<ThreadMessage[]>([])
 const threadLoading = ref(false)
 const labelMenuRef = ref<HTMLElement | null>(null)
 const labelButtonRef = ref<HTMLElement | null>(null)
@@ -238,7 +238,7 @@ const handleAddToLabel = async (labelId: string) => {
                 <span class="sender-email">{{ threadMail.senderEmail }}</span>
               </div>
             </div>
-            <span class="message-time">{{ formatShortDate(new Date(threadMail.receivedAt).getTime()) }}</span>
+            <span class="message-time">{{ formatShortDate(new Date(threadMail.sentAt).getTime()) }}</span>
           </div>
 
           <div class="thread-message-subject" v-if="index === 0">
