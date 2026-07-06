@@ -7,6 +7,7 @@ import com.smartmail.attachment.service.AttachmentService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.CurrentUser;
 import com.smartmail.common.security.UserContext;
+import com.smartmail.common.validation.SmartMailAddress;
 import com.smartmail.mail.dto.MailDetailResponse;
 import com.smartmail.mail.dto.MailSendResponse;
 import com.smartmail.mail.dto.SendMailRequest;
@@ -66,6 +67,10 @@ public class MailService {
         if (sender == null) {
             throw new BusinessException(401, "请先登录");
         }
+        Map<String, String> recipientTypes = new LinkedHashMap<>();
+        addRecipients(recipientTypes, request.to(), "TO");
+        addRecipients(recipientTypes, request.cc(), "CC");
+        addRecipients(recipientTypes, request.bcc(), "BCC");
         LocalDateTime now = LocalDateTime.now();
         MailMessage message = new MailMessage();
         message.setMessageNo("SM-" + UUID.randomUUID());
@@ -90,10 +95,6 @@ public class MailService {
         }
 
         createMailboxItem(sender.id(), message.getId(), "SENT", true, now);
-        Map<String, String> recipientTypes = new LinkedHashMap<>();
-        addRecipients(recipientTypes, request.to(), "TO");
-        addRecipients(recipientTypes, request.cc(), "CC");
-        addRecipients(recipientTypes, request.bcc(), "BCC");
         List<String> delivered = new ArrayList<>();
         List<String> failed = new ArrayList<>();
         for (Map.Entry<String, String> recipientEntry : recipientTypes.entrySet()) {
@@ -274,7 +275,11 @@ public class MailService {
             if (rawEmail == null || rawEmail.isBlank()) {
                 continue;
             }
-            recipients.putIfAbsent(rawEmail.trim().toLowerCase(), type);
+            String email = SmartMailAddress.normalize(rawEmail);
+            if (!SmartMailAddress.isAllowed(email)) {
+                throw new BusinessException(400, "邮箱必须使用 @smail.com 后缀: " + rawEmail.trim());
+            }
+            recipients.putIfAbsent(email, type);
         }
     }
 }

@@ -18,6 +18,7 @@ let saveTimer: number | undefined
 
 const draftKey = () => `smartmail_draft_${mailStore.user?.id || 'anonymous'}`
 const addresses = (value: string) => value.split(',').map(item => item.trim()).filter(Boolean)
+const isSmartMailAddress = (value: string) => /^[A-Za-z0-9._%+-]+@smail\.com$/i.test(value)
 const notifyDraftChanged = () => window.dispatchEvent(new CustomEvent('smartmail:draft-changed'))
 
 const saveDraft = () => {
@@ -91,16 +92,23 @@ const clearDraft = () => {
 
 const handleSend = async () => {
   const to = addresses(form.to)
+  const cc = addresses(form.cc)
+  const bcc = addresses(form.bcc)
   if (!to.length || !form.subject.trim() || !form.content.trim()) {
     ElMessage.warning('请填写收件人、主题和正文')
+    return
+  }
+  const invalidAddresses = [...to, ...cc, ...bcc].filter(address => !isSmartMailAddress(address))
+  if (invalidAddresses.length) {
+    ElMessage.warning(`邮箱必须使用 @smail.com 后缀：${invalidAddresses.join(', ')}`)
     return
   }
   sending.value = true
   try {
     const result = await mailStore.sendMessage({
       to,
-      cc: addresses(form.cc),
-      bcc: addresses(form.bcc),
+      cc,
+      bcc,
       subject: form.subject.trim(),
       contentText: form.content,
       pendingAttachmentIds: attachments.value.map(item => item.pendingAttachmentId)

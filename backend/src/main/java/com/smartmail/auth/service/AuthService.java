@@ -6,6 +6,7 @@ import com.smartmail.auth.dto.RegisterRequest;
 import com.smartmail.category.service.CategoryService;
 import com.smartmail.common.exception.BusinessException;
 import com.smartmail.common.security.TokenService;
+import com.smartmail.common.validation.SmartMailAddress;
 import com.smartmail.user.entity.SysUser;
 import com.smartmail.user.mapper.SysUserMapper;
 import com.smartmail.user.service.UserSettingService;
@@ -39,11 +40,15 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userMapper.findByEmail(request.email()) != null) {
+        String email = SmartMailAddress.normalize(request.email());
+        if (!SmartMailAddress.isAllowed(email)) {
+            throw new BusinessException(400, "邮箱必须使用 @smail.com 后缀");
+        }
+        if (userMapper.findByEmail(email) != null) {
             throw new BusinessException("Email is already registered");
         }
         SysUser user = new SysUser();
-        user.setEmail(request.email().trim().toLowerCase());
+        user.setEmail(email);
         user.setUsername(request.username().trim());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setStatus("ACTIVE");
@@ -56,7 +61,11 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        SysUser user = userMapper.findByEmail(request.email().trim().toLowerCase());
+        String email = SmartMailAddress.normalize(request.email());
+        if (!SmartMailAddress.isAllowed(email)) {
+            throw new BusinessException(401, "Email or password is incorrect");
+        }
+        SysUser user = userMapper.findByEmail(email);
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BusinessException(401, "Email or password is incorrect");
         }

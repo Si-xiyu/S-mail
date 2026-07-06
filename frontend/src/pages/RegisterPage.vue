@@ -17,6 +17,7 @@ const form = ref({
 })
 
 const loading = ref(false)
+const smartMailPattern = /^[A-Za-z0-9._%+-]+@smail\.com$/i
 
 const validatePassword = (rule: any, value: any, callback: any) => {
   if (value === '') {
@@ -31,7 +32,8 @@ const validatePassword = (rule: any, value: any, callback: any) => {
 const rules = {
   email: [
     { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' },
+    { pattern: smartMailPattern, message: '邮箱必须使用 @smail.com 后缀', trigger: 'blur' }
   ],
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
@@ -80,7 +82,7 @@ const goToLogin = () => {
         <el-form-item prop="email">
           <el-input
             v-model="form.email"
-            placeholder="邮箱地址"
+            placeholder="name@smail.com"
             clearable
             type="email"
             size="large"

@@ -73,7 +73,7 @@ class MailServiceSecurityAndThreadTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("code").isEqualTo(401);
 
-        UserContext.set(new CurrentUser(2L, "other@smartmail.local", "Other"));
+        UserContext.set(new CurrentUser(2L, "other@smail.com", "Other"));
         when(mailboxMapper.findVisibleByUserAndMail(2L, 10L)).thenReturn(null);
         assertThatThrownBy(() -> service.getThread(10L))
                 .isInstanceOf(BusinessException.class)
@@ -85,7 +85,7 @@ class MailServiceSecurityAndThreadTest {
 
     @Test
     void threadAndPathReturnVisibleRootAndReplyInOrderAsDto() {
-        UserContext.set(new CurrentUser(1L, "user@smartmail.local", "User"));
+        UserContext.set(new CurrentUser(1L, "user@smail.com", "User"));
         LocalDateTime rootTime = LocalDateTime.of(2026, 7, 6, 10, 0);
         MailMessage root = message(10L, null, 10L, rootTime, "Root");
         MailMessage reply = message(11L, 10L, 10L, rootTime.plusMinutes(5), "Reply");
@@ -107,10 +107,10 @@ class MailServiceSecurityAndThreadTest {
 
     @Test
     void sendRejectsForgedParentBeforePersistingMail() {
-        UserContext.set(new CurrentUser(1L, "sender@smartmail.local", "Sender"));
+        UserContext.set(new CurrentUser(1L, "sender@smail.com", "Sender"));
         when(mailboxMapper.findVisibleByUserAndMail(1L, 999L)).thenReturn(null);
 
-        assertThatThrownBy(() -> service.send(request(List.of("to@smartmail.local"), List.of(), List.of(), 999L)))
+        assertThatThrownBy(() -> service.send(request(List.of("to@smail.com"), List.of(), List.of(), 999L)))
                 .isInstanceOf(BusinessException.class)
                 .extracting("code").isEqualTo(404);
         verify(mailMapper, never()).insert(any(MailMessage.class));
@@ -118,18 +118,18 @@ class MailServiceSecurityAndThreadTest {
 
     @Test
     void sendDeduplicatesRecipientsAndPersistsBccType() {
-        UserContext.set(new CurrentUser(1L, "sender@smartmail.local", "Sender"));
-        when(userMapper.findByEmail("alice@smartmail.local")).thenReturn(user(2L, "alice@smartmail.local"));
-        when(userMapper.findByEmail("bob@smartmail.local")).thenReturn(user(3L, "bob@smartmail.local"));
+        UserContext.set(new CurrentUser(1L, "sender@smail.com", "Sender"));
+        when(userMapper.findByEmail("alice@smail.com")).thenReturn(user(2L, "alice@smail.com"));
+        when(userMapper.findByEmail("bob@smail.com")).thenReturn(user(3L, "bob@smail.com"));
         doAnswer(invocation -> {
             invocation.<MailMessage>getArgument(0).setId(500L);
             return 1;
         }).when(mailMapper).insert(any(MailMessage.class));
 
         var response = service.send(request(
-                List.of("Alice@smartmail.local"),
-                List.of("alice@smartmail.local"),
-                List.of("bob@smartmail.local", "BOB@smartmail.local"),
+                List.of("Alice@smail.com"),
+                List.of("alice@smail.com"),
+                List.of("bob@smail.com", "BOB@smail.com"),
                 null));
 
         ArgumentCaptor<MailRecipient> captor = ArgumentCaptor.forClass(MailRecipient.class);
@@ -137,10 +137,22 @@ class MailServiceSecurityAndThreadTest {
         assertThat(captor.getAllValues())
                 .extracting(MailRecipient::getRecipientEmail, MailRecipient::getRecipientType)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("alice@smartmail.local", "TO"),
-                        org.assertj.core.groups.Tuple.tuple("bob@smartmail.local", "BCC"));
+                        org.assertj.core.groups.Tuple.tuple("alice@smail.com", "TO"),
+                        org.assertj.core.groups.Tuple.tuple("bob@smail.com", "BCC"));
         assertThat(response.delivery().delivered())
-                .containsExactlyInAnyOrder("alice@smartmail.local", "bob@smartmail.local");
+                .containsExactlyInAnyOrder("alice@smail.com", "bob@smail.com");
+    }
+
+    @Test
+    void sendRejectsNonSmartMailRecipientBeforePersistingMail() {
+        UserContext.set(new CurrentUser(1L, "sender@smail.com", "Sender"));
+
+        assertThatThrownBy(() -> service.send(request(
+                List.of("outside@example.com"), List.of(), List.of(), null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(400);
+
+        verify(mailMapper, never()).insert(any(MailMessage.class));
     }
 
     @Test
@@ -149,21 +161,21 @@ class MailServiceSecurityAndThreadTest {
         mail.setSenderId(1L);
         MailboxItem senderItem = item(100L, 500L, 1L);
         MailboxItem recipientItem = item(200L, 500L, 2L);
-        MailRecipient to = recipient(500L, "alice@smartmail.local", "TO");
-        MailRecipient bcc = recipient(500L, "bob@smartmail.local", "BCC");
+        MailRecipient to = recipient(500L, "alice@smail.com", "TO");
+        MailRecipient bcc = recipient(500L, "bob@smail.com", "BCC");
         when(mailMapper.selectById(500L)).thenReturn(mail);
         when(recipientMapper.selectList(any())).thenReturn(List.of(to, bcc));
         when(aiResultMapper.listByMailAndUser(anyLong(), anyLong())).thenReturn(List.of());
         when(attachmentService.getAttachmentsForMail(500L)).thenReturn(List.of());
 
-        UserContext.set(new CurrentUser(2L, "alice@smartmail.local", "Alice"));
+        UserContext.set(new CurrentUser(2L, "alice@smail.com", "Alice"));
         when(mailboxMapper.findVisibleByUserAndMail(2L, 500L)).thenReturn(recipientItem);
-        assertThat(service.detail(500L).recipients()).containsExactly("alice@smartmail.local");
+        assertThat(service.detail(500L).recipients()).containsExactly("alice@smail.com");
 
-        UserContext.set(new CurrentUser(1L, "sender@smartmail.local", "Sender"));
+        UserContext.set(new CurrentUser(1L, "sender@smail.com", "Sender"));
         when(mailboxMapper.findVisibleByUserAndMail(1L, 500L)).thenReturn(senderItem);
         assertThat(service.detail(500L).recipients())
-                .containsExactly("alice@smartmail.local", "bob@smartmail.local");
+                .containsExactly("alice@smail.com", "bob@smail.com");
     }
 
     private SendMailRequest request(List<String> to, List<String> cc, List<String> bcc, Long parentMailId) {
@@ -174,7 +186,7 @@ class MailServiceSecurityAndThreadTest {
         MailMessage message = new MailMessage();
         message.setId(id);
         message.setSenderId(1L);
-        message.setSenderEmail("sender@smartmail.local");
+        message.setSenderEmail("sender@smail.com");
         message.setSubject(subject);
         message.setContentText("Body");
         message.setParentMailId(parentId);
