@@ -10,6 +10,7 @@ const emit = defineEmits<{
   composeClick: []
   draftClick: []
   settingsClick: []
+  labelSelect: [labelId: string]
 }>()
 
 // 系统自带标签的 ID 列表
@@ -38,6 +39,7 @@ const selectLabel = (labelId: string) => {
     return
   }
   mailStore.selectLabel(labelId)
+  emit('labelSelect', labelId)
 }
 
 const handleComposeClick = () => {

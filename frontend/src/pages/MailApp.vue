@@ -98,6 +98,10 @@ const handleComposeBtnClick = () => {
   showCompose.value = true
 }
 
+const handleLabelSelect = () => {
+  selectedMailId.value = null
+}
+
 </script>
 
 <template>
@@ -109,6 +113,7 @@ const handleComposeBtnClick = () => {
         @compose-click="handleComposeBtnClick"
         @draft-click="handleComposeBtnClick"
         @settings-click="showSettings = true"
+        @label-select="handleLabelSelect"
       />
 
       <!-- 中间面板：目录 ⇄ 邮件内容 -->

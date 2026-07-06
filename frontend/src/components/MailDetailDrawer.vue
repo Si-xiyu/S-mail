@@ -161,6 +161,7 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
           <line x1="19" y1="12" x2="5" y2="12" />
           <polyline points="12 19 5 12 12 5" />
         </svg>
+        <span>返回邮件列表</span>
       </button>
       <div v-if="detail" class="header-actions">
         <button type="button" @click="toggleStar">{{ detail.starred ? '★' : '☆' }}</button>
@@ -308,7 +309,8 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  gap: 6px;
+  width: auto;
   height: 32px;
   border: none;
   border-radius: 4px;
