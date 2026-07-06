@@ -203,11 +203,6 @@ export const useMailStore = defineStore('mail', () => {
       page.value = result.page
       currentLabel.value = folder
 
-      // 更新标签计数
-      const label = labels.value.find(l => l.id === folder)
-      if (label) {
-        label.count = result.total
-      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载邮箱失败'
       if (propagateError) {
@@ -340,10 +335,19 @@ export const useMailStore = defineStore('mail', () => {
 
   const applyNotificationCounts = (notification: NotificationPollResponse): void => {
     unreadCount.value = notification.unreadCount
-    const inbox = labels.value.find(label => label.id === 'INBOX')
-    const junk = labels.value.find(label => label.id === 'JUNK')
-    if (inbox) inbox.count = notification.inboxCount
-    if (junk) junk.count = notification.junkCount
+    for (const label of labels.value) {
+      if (label.id !== 'DRAFTS') {
+        label.count = notification.unreadByLabel[label.id] ?? 0
+      }
+    }
+  }
+
+  const refreshUnreadCounts = async (): Promise<void> => {
+    try {
+      applyNotificationCounts(await apiClient.pollNotifications())
+    } catch (err) {
+      console.error('Failed to refresh unread counts:', err)
+    }
   }
 
   const refreshDraftCount = (): void => {
@@ -379,6 +383,7 @@ export const useMailStore = defineStore('mail', () => {
       if (item) {
         item.read = read
       }
+      void refreshUnreadCounts()
     } catch (err) {
       error.value = err instanceof Error ? err.message : '更新邮件状态失败'
       throw err
@@ -397,6 +402,7 @@ export const useMailStore = defineStore('mail', () => {
       if (item) {
         item.starred = starred
       }
+      void refreshUnreadCounts()
     } catch (err) {
       error.value = err instanceof Error ? err.message : '更新星标状态失败'
       throw err
@@ -413,6 +419,7 @@ export const useMailStore = defineStore('mail', () => {
       // 删除邮件后重新加载当前文件夹的邮件列表
       // 这样可以正确显示邮件已移到回收站
       await loadMailbox(currentLabel.value)
+      void refreshUnreadCounts()
     } catch (err) {
       error.value = err instanceof Error ? err.message : '删除邮件失败'
       throw err
@@ -431,6 +438,7 @@ export const useMailStore = defineStore('mail', () => {
       if (item) {
         item.folder = folder
       }
+      void refreshUnreadCounts()
     } catch (err) {
       error.value = err instanceof Error ? err.message : '移动邮件失败'
       throw err
@@ -673,6 +681,7 @@ export const useMailStore = defineStore('mail', () => {
       const item = mailboxItems.value.find(m => m.mailId === mailId)
       if (item) {
         await apiClient.changeCategory(item.itemId, catId)
+        void refreshUnreadCounts()
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '添加到分类失败'

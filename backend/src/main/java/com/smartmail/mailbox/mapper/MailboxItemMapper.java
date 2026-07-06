@@ -183,6 +183,30 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
     @Select("""
             SELECT COUNT(*) FROM mailbox_item
             WHERE user_id = #{userId}
+              AND deleted_flag = FALSE
+              AND read_flag = FALSE
+              AND star_flag = TRUE
+            """)
+    long countUnreadStarred(Long userId);
+
+    @Select("""
+            SELECT COUNT(DISTINCT mi.id)
+            FROM mailbox_item mi
+            JOIN mail_category_assignment a
+              ON a.mail_id = mi.mail_id AND a.user_id = mi.user_id
+            JOIN mail_category c
+              ON c.id = a.category_id AND c.user_id = a.user_id
+            WHERE mi.user_id = #{userId}
+              AND a.category_id = #{categoryId}
+              AND mi.deleted_flag = FALSE
+              AND mi.read_flag = FALSE
+            """)
+    long countUnreadByCategory(@Param("userId") Long userId,
+                               @Param("categoryId") Long categoryId);
+
+    @Select("""
+            SELECT COUNT(*) FROM mailbox_item
+            WHERE user_id = #{userId}
               AND folder = 'INBOX'
               AND deleted_flag = FALSE
               AND priority IN ('HIGH', 'URGENT')

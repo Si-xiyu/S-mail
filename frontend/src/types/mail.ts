@@ -116,6 +116,7 @@ export interface NotificationPollResponse {
   newMailCount: number
   inboxCount: number
   junkCount: number
+  unreadByLabel: Record<string, number>
   cursor: string
 }
 
