@@ -24,7 +24,7 @@ class ToolRouterTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status, "DISABLED")
-        self.assertIn("disabled", response.answer.lower())
+        self.assertIn("关闭", response.answer)
         self.assertEqual(response.tool_calls, [])
         self.assertEqual(response.pending_actions, [])
 
@@ -39,7 +39,7 @@ class ToolRouterTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status, "SUCCEEDED")
-        self.assertIn("mock retrieval", response.answer)
+        self.assertIn("mock", response.answer.lower())
         self.assertEqual(response.tool_calls[0].tool, "rag_tool")
         self.assertEqual(response.tool_calls[0].source, "MOCK")
         self.assertEqual(response.tool_calls[0].output["records"][0]["source"], "MOCK")
@@ -59,7 +59,7 @@ class ToolRouterTest(unittest.TestCase):
         self.assertEqual(response.status, "SUCCEEDED")
         self.assertEqual(response.pending_actions[0].type, "MARK_READ")
         self.assertEqual(response.pending_actions[0].action_id, "s1:42:MARK_READ")
-        self.assertEqual(response.pending_actions[0].label, "Mark as read")
+        self.assertEqual(response.pending_actions[0].label, "标记为已读")
         self.assertEqual(response.pending_actions[0].status, "PENDING")
         self.assertEqual(response.pending_actions[0].payload["mailItemId"], 42)
 

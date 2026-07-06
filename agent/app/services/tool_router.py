@@ -17,10 +17,10 @@ from app.tools.backend_tools import BackendToolClient, to_mail_context
 
 BACKEND_ACTION_EXECUTE_PATH = "/internal/v1/tools/mail-actions/execute"
 ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any], str]] = {
-    "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}, "Move to junk"),
-    "MARK_READ": ("MARK_READ", {"read": True}, "Mark as read"),
-    "SET_PRIORITY": ("SET_PRIORITY", {"priority": "HIGH"}, "Set priority: HIGH"),
-    "SET_CATEGORY": ("SET_CATEGORY", {}, "Set category"),
+    "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}, "移入 Junk"),
+    "MARK_READ": ("MARK_READ", {"read": True}, "标记为已读"),
+    "SET_PRIORITY": ("SET_PRIORITY", {"priority": "HIGH"}, "标记为高优先级"),
+    "SET_CATEGORY": ("SET_CATEGORY", {}, "设置分类"),
 }
 
 
@@ -33,7 +33,9 @@ class ToolRouter:
         if not _plugin_enabled(request.plugin_config):
             return PluginChatResponse(
                 status="DISABLED",
-                answer="AI Plugin is disabled. Basic Mail Mode remains available.",
+                answer="AI Plugin 已关闭，系统处于基础邮箱模式。",
+                tool_calls=[],
+                pending_actions=[],
             )
 
         if request.scope == "GLOBAL":
@@ -46,7 +48,7 @@ class ToolRouter:
                 status="DISABLED",
                 actionId=request.action_id,
                 execution="NONE",
-                message="AI Plugin is disabled; no action was executed.",
+                message="AI Plugin 已关闭，未执行任何操作。",
             )
 
         if request.type not in ACTION_KEYWORDS:
@@ -54,7 +56,7 @@ class ToolRouter:
                 status="REJECTED",
                 actionId=request.action_id,
                 execution="NONE",
-                message=f"Unsupported action type: {request.type}.",
+                message=f"不支持的操作类型: {request.type}。",
             )
 
         payload = _normalized_action_payload(request.payload)
@@ -63,7 +65,7 @@ class ToolRouter:
                 status="REJECTED",
                 actionId=request.action_id,
                 execution="NONE",
-                message="categoryId is required for SET_CATEGORY.",
+                message="SET_CATEGORY 必须提供 categoryId。",
             )
 
         if not request.confirmed and not _auto_write_enabled(request.tool_policy):
@@ -71,7 +73,7 @@ class ToolRouter:
                 status="REJECTED",
                 actionId=request.action_id,
                 execution="NONE",
-                message="Action was not confirmed and agentAutoWriteEnabled is false.",
+                message="操作未确认且未开启 agentAutoWriteEnabled。",
             )
 
         return ConfirmedActionExecuteResponse(
@@ -83,88 +85,86 @@ class ToolRouter:
                 path=BACKEND_ACTION_EXECUTE_PATH,
                 payload=payload,
             ),
-            message="Action confirmed; backend execution is required.",
+            message="操作已确认，将由后端执行。",
         )
 
+    # ------------------------------------------------------------------
+    # Current mail
+    # ------------------------------------------------------------------
     def _handle_current_mail(self, request: PluginChatRequest) -> PluginChatResponse:
-        action_type, _, _ = _detect_action(request.message)
-        if action_type is not None:
-            if _mail_item_id_from_context(request.context) is None:
-                return PluginChatResponse(
-                    status="FAILED",
-                    answer="mailItemId is required before preparing a backend mail action.",
-                )
-            if action_type == "SET_CATEGORY" and _category_id_from_context(request.context) is None:
-                return PluginChatResponse(
-                    status="FAILED",
-                    answer="categoryId is required before preparing a SET_CATEGORY action.",
-                )
-
-        pending_actions = self._mail_action_tool(request)
-        if pending_actions:
-            return PluginChatResponse(
-                status="SUCCEEDED",
-                answer="I prepared the requested mail action for backend handling. No local mail state was changed by the Agent.",
-                tool_calls=[
-                    ToolCallRecord(
-                        tool="mail_action_tool",
-                        status="PENDING",
-                        input={"message": request.message, "agentAutoWriteEnabled": _auto_write_enabled(request.tool_policy)},
-                        output={"pendingActions": [action.model_dump(by_alias=True) for action in pending_actions]},
-                    )
-                ],
-                pending_actions=pending_actions,
-            )
-
         mail_result = self.backend_tools.get_current_mail_context(request.context, request.user_id)
         tool_call = ToolCallRecord(
             tool="mail_context_tool",
-            status="SUCCESS" if mail_result.ok else "FAILED",
+            status="SUCCEEDED" if mail_result.ok else "FAILED",
             input={"scope": request.scope, "contextKeys": sorted(request.context.keys())},
             output=mail_result.data or {},
             source=(mail_result.data or {}).get("source"),
             error=mail_result.error,
         )
+
         if not mail_result.ok or mail_result.data is None:
             return PluginChatResponse(
                 status="FAILED",
-                answer="I could not retrieve current-mail context from the backend, and mock fallback is disabled.",
+                answer="无法从后端获取当前邮件上下文，且未启用 mock 降级。",
                 tool_calls=[tool_call],
             )
 
         mail = to_mail_context(mail_result.data)
+
+        # Write intent: only generate whitelisted pending actions.
+        action_type, _, _ = _detect_action(request.message)
+        if action_type is not None and _mail_item_id_from_context(request.context) is None:
+            return PluginChatResponse(
+                status="FAILED",
+                answer="写操作需要 mailItemId 上下文，但未提供。",
+                tool_calls=[tool_call],
+            )
+
+        pending_actions = self._mail_action_tool(request)
+        if pending_actions:
+            return PluginChatResponse(
+                status="SUCCEEDED",
+                answer=_describe_pending_actions(pending_actions),
+                tool_calls=[
+                    tool_call,
+                    ToolCallRecord(
+                        tool="mail_action_tool",
+                        status="PENDING",
+                        input={"message": request.message, "autoWrite": _auto_write_enabled(request.tool_policy)},
+                        output={"pendingActions": [action.model_dump(by_alias=True) for action in pending_actions]},
+                    ),
+                ],
+                pending_actions=pending_actions,
+            )
+
         return PluginChatResponse(
             status="SUCCEEDED",
             answer=_answer_current_mail(request.message, mail.subject, mail.sender_email, mail.content_text),
             tool_calls=[tool_call],
         )
 
-    def _handle_global(self, request: PluginChatRequest) -> PluginChatResponse:
-        records, tool_call = self.rag_tool.search(request.message, request.context)
-        answer = (
-            "This answer is based on available/mock retrieval context. "
-            "Full mailbox retrieval is not implemented in this Agent MVP. "
-            f"Mock matches: {', '.join(record['title'] for record in records)}."
-        )
-        return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
-
     def _mail_action_tool(self, request: PluginChatRequest) -> list[PendingAction]:
         action_type, payload, label = _detect_action(request.message)
         if action_type is None:
             return []
 
+        mail_item_id = _mail_item_id_from_context(request.context)
+        if mail_item_id is None:
+            return []
+
+        if action_type == "SET_CATEGORY":
+            category_id = _category_id_from_context(request.context)
+            if category_id is None:
+                return []
+            payload = {**payload, "categoryId": category_id}
+
         auto_write = _auto_write_enabled(request.tool_policy)
         reason = (
-            "agentAutoWriteEnabled=true and action is whitelisted; backend delegation required."
+            "agentAutoWriteEnabled=true，允许自动委派后端执行。"
             if auto_write
-            else "agentAutoWriteEnabled=false; user confirmation is required."
+            else "agentAutoWriteEnabled=false，需要用户在界面确认。"
         )
-        mail_item_id = _mail_item_id_from_context(request.context)
-        full_payload = {**payload}
-        full_payload["mailItemId"] = mail_item_id
-        if action_type == "SET_CATEGORY":
-            full_payload["categoryId"] = _category_id_from_context(request.context)
-        full_payload["userId"] = request.user_id
+        full_payload = {**payload, "mailItemId": mail_item_id, "userId": request.user_id}
         return [
             PendingAction(
                 actionId=_action_id(request.session_id, action_type, mail_item_id),
@@ -176,6 +176,40 @@ class ToolRouter:
                 execution="BACKEND_REQUIRED",
             )
         ]
+
+    # ------------------------------------------------------------------
+    # Global
+    # ------------------------------------------------------------------
+    def _handle_global(self, request: PluginChatRequest) -> PluginChatResponse:
+        search_result = self.backend_tools.search_mail(
+            request.user_id,
+            request.message,
+            folder=None,
+            limit=5,
+        )
+
+        records: list[dict[str, Any]] = []
+        if search_result.ok and isinstance(search_result.data, list):
+            records = search_result.data[:5]
+
+        if records:
+            tool_call = ToolCallRecord(
+                tool="mail_search_tool",
+                status="SUCCEEDED",
+                input={"query": request.message, "limit": 5},
+                output={"records": records, "source": "BACKEND"},
+                source="BACKEND",
+            )
+            answer = _answer_from_records(request.message, records)
+        else:
+            records, tool_call = self.rag_tool.search(request.message, request.context)
+            answer = (
+                "暂未从后端检索到相关邮件，当前返回 mock 示例结果。"
+                "完整邮箱问答将在接入 BM25 + 向量检索后提供。"
+                f"\n示例匹配: {', '.join(r.get('title') or r.get('subject') or 'unknown' for r in records)}。"
+            )
+
+        return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
 
 
 def _plugin_enabled(plugin_config: dict[str, Any]) -> bool:
@@ -191,14 +225,31 @@ def _auto_write_enabled(tool_policy: dict[str, Any]) -> bool:
 
 def _detect_action(message: str) -> tuple[Any, dict[str, Any], str | None]:
     text = message.lower()
-    if any(word in text for word in ("垃圾", "junk", "spam")) and any(word in text for word in ("移", "move", "标为", "mark")):
+
+    # Junk / spam
+    if any(word in text for word in ("垃圾", "junk", "spam", "广告")) and any(
+        word in text for word in ("移", "move", "标为", "mark", "删", "delete")
+    ):
         return ACTION_KEYWORDS["MOVE_TO_JUNK"]
-    if any(word in text for word in ("已读", "read")) and any(word in text for word in ("标", "mark", "设", "set")):
+
+    # Read
+    if any(word in text for word in ("已读", "read")) and any(
+        word in text for word in ("标", "mark", "设", "set")
+    ):
         return ACTION_KEYWORDS["MARK_READ"]
-    if any(word in text for word in ("优先级", "priority", "重要", "urgent")) and any(word in text for word in ("设", "set", "标", "mark", "改")):
+
+    # Priority
+    if any(word in text for word in ("优先级", "priority", "重要", "urgent", "高优先级")) and any(
+        word in text for word in ("设", "set", "标", "mark", "改", "提升")
+    ):
         return ACTION_KEYWORDS["SET_PRIORITY"]
-    if any(word in text for word in ("分类", "category", "标签", "label")) and any(word in text for word in ("设", "set", "标", "mark", "加", "add")):
+
+    # Category
+    if any(word in text for word in ("分类", "category", "标签", "label")) and any(
+        word in text for word in ("设", "set", "标", "mark", "加", "add", "移到", "move")
+    ):
         return ACTION_KEYWORDS["SET_CATEGORY"]
+
     return None, {}, None
 
 
@@ -225,24 +276,51 @@ def _action_id(session_id: str, action_type: str, mail_item_id: Any) -> str:
     return f"{session_id}:{mail_part}:{action_type}".replace(" ", "-")
 
 
+def _shorten(content: str, limit: int = 180) -> str:
+    cleaned = " ".join(content.split())
+    return cleaned[:limit] + ("..." if len(cleaned) > limit else "")
+
+
 def _answer_current_mail(message: str, subject: str, sender: str, content: str) -> str:
     text = message.lower()
     summary = _shorten(content)
+    if any(word in text for word in ("总结", "摘要", "summarize", "summary")):
+        return f"这封邮件来自 {sender}，主题是「{subject}」。要点如下：{summary}"
     if any(word in text for word in ("做什么", "需要我", "action", "todo", "task")):
-        return f"这封邮件来自 {sender}，主题是“{subject}”。你需要先确认邮件诉求，再按邮件内容处理：{summary}"
+        return f"邮件来自 {sender}，主题「{subject}」。建议你先确认诉求并按内容处理：{summary}"
     if any(word in text for word in ("回复", "reply")):
-        return f"回复思路：先确认已收到“{subject}”，再回应关键事项，最后给出你的下一步或预计完成时间。可参考邮件内容：{summary}"
-    if any(word in text for word in ("安全", "safe", "phishing", "钓鱼")):
-        risk = "存在链接或紧急措辞时需要人工核验发件人和链接域名。" if _looks_risky(content) else "未从当前上下文看到明显高风险信号，但仍应核验发件人和附件/链接。"
-        return f"安全判断：{risk} 发件人：{sender}；主题：“{subject}”。"
-    return f"基于当前邮件上下文，主题是“{subject}”，发件人是 {sender}。可用摘要：{summary}"
-
-
-def _shorten(content: str) -> str:
-    cleaned = " ".join(content.split())
-    return cleaned[:180] + ("..." if len(cleaned) > 180 else "")
+        return (
+            f"回复思路：先确认已收到「{subject}」，再回应关键事项，"
+            f"最后给出你的下一步或预计完成时间。可参考内容：{summary}"
+        )
+    if any(word in text for word in ("安全", "safe", "phishing", "钓鱼", "风险")):
+        risk = "正文中包含链接或紧急措辞，建议人工核验发件人和链接域名。" if _looks_risky(content) else "当前未看到明显高风险信号，但仍应核验发件人和附件/链接。"
+        return f"安全判断：{risk} 发件人：{sender}；主题：「{subject}」。"
+    return f"基于当前邮件上下文，主题是「{subject}」，发件人是 {sender}。内容摘要：{summary}"
 
 
 def _looks_risky(content: str) -> bool:
     lowered = content.lower()
-    return any(token in lowered for token in ("password", "verify", "urgent", "http://", "验证码", "密码", "立即", "点击"))
+    return any(
+        token in lowered
+        for token in ("password", "verify", "urgent", "http://", "验证码", "密码", "立即", "点击", "中奖", "转账")
+    )
+
+
+def _describe_pending_actions(actions: list[PendingAction]) -> str:
+    if not actions:
+        return "已准备好操作，等待确认。"
+    labels = ", ".join(action.label for action in actions)
+    return f"我可以帮你执行以下操作：{labels}。请在界面确认后由后端执行。"
+
+
+def _answer_from_records(message: str, records: list[dict[str, Any]]) -> str:
+    if not records:
+        return "未找到相关邮件。"
+    parts = []
+    for idx, record in enumerate(records[:3], start=1):
+        subject = record.get("subject") or record.get("title") or "无主题"
+        sender = record.get("senderEmail") or "未知发件人"
+        snippet = record.get("snippet") or record.get("preview") or ""
+        parts.append(f"{idx}. 「{subject}」 ({sender}) {snippet}")
+    return "找到以下相关邮件：\n" + "\n".join(parts) + "\n你可以让我对其中一封邮件执行摘要或操作。"

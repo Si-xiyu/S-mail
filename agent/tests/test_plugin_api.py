@@ -233,7 +233,7 @@ class PluginApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["status"], "SUCCEEDED")
-        self.assertIn("mock retrieval", body["answer"])
+        self.assertIn("mock", body["answer"].lower())
         self.assertEqual(body["toolCalls"][0]["tool"], "rag_tool")
         self.assertEqual(body["toolCalls"][0]["source"], "MOCK")
 
@@ -256,7 +256,7 @@ class PluginApiTests(unittest.TestCase):
         self.assertEqual(body["status"], "SUCCEEDED")
         action = body["pendingActions"][0]
         self.assertEqual(action["actionId"], "s1:88:SET_PRIORITY")
-        self.assertEqual(action["label"], "Set priority: HIGH")
+        self.assertEqual(action["label"], "标记为高优先级")
         self.assertEqual(action["payload"]["mailItemId"], 88)
         self.assertNotIn("mailId", action["payload"])
         self.assertEqual(action["status"], "PENDING")
