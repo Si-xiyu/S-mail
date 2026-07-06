@@ -3,10 +3,6 @@ import { useMailStore } from '../stores/mailStore'
 import { ElMessage } from 'element-plus'
 import { computed } from 'vue'
 
-const props = defineProps<{
-  selectedMailId?: string | null
-}>()
-
 const mailStore = useMailStore()
 
 const emit = defineEmits<{
@@ -90,7 +86,6 @@ const formatTime = (timestamp: number) => {
         :key="item.id"
         class="mail-row"
         :class="{
-          selected: props.selectedMailId === item.id,
           unread: !item.read
         }"
         @click="handleSelectMail(item.id)"

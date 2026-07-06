@@ -5,7 +5,7 @@ import * as apiClient from '../api/client'
 import { useMailStore } from '../stores/mailStore'
 import type { MailDetail, ThreadMessage } from '../types/mail'
 
-const props = defineProps<{ mailId?: string | null; inline?: boolean }>()
+const props = defineProps<{ mailId?: string | null; inline?: boolean; showBack?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const mailStore = useMailStore()
 
@@ -156,6 +156,12 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
   <!-- Inline mode: rendered as a normal block panel -->
   <div v-if="inline && mailId" class="inline-panel">
     <header class="drawer-header">
+      <button v-if="showBack" class="back-btn" type="button" @click="emit('close')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+      </button>
       <div v-if="detail" class="header-actions">
         <button type="button" @click="toggleStar">{{ detail.starred ? '★' : '☆' }}</button>
         <select aria-label="添加标签" @change="assignLabel">
@@ -295,6 +301,27 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
   justify-content: space-between;
   border-bottom: 1px solid #e0e0e0;
   background: #fbfbfa;
+  gap: 12px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: rgba(55, 53, 47, 0.55);
+  flex-shrink: 0;
+  transition: all 0.1s;
+}
+
+.back-btn:hover {
+  background: #f4f4f4;
+  color: #37352f;
 }
 
 .drawer-header button, .drawer-header select { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; padding: 5px 10px; cursor: pointer; font-size: 12px; color: #37352f; transition: background 0.1s; }

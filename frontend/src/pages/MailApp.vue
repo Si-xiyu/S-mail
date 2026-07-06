@@ -111,23 +111,25 @@ const handleComposeBtnClick = () => {
         @settings-click="showSettings = true"
       />
 
-      <MailList
-        :selected-mail-id="selectedMailId"
-        @select-mail="handleSelectMail"
-      />
-
-      <div class="right-panel">
-        <WelcomePanel
+      <!-- 中间面板：目录 ⇄ 邮件内容 -->
+      <div class="middle-panel">
+        <MailList
           v-if="!selectedMailId"
-          @compose-click="handleComposeBtnClick"
+          @select-mail="handleSelectMail"
         />
         <MailDetailDrawer
           v-else
           :mail-id="selectedMailId"
           inline
+          show-back
           @close="selectedMailId = null"
         />
       </div>
+
+      <!-- 右侧面板：欢迎页（以后接 AI 对话） -->
+      <aside class="right-panel">
+        <WelcomePanel @compose-click="handleComposeBtnClick" />
+      </aside>
     </div>
 
     <ComposeDialog v-model="showCompose" />
@@ -157,9 +159,17 @@ const handleComposeBtnClick = () => {
   gap: 0;
 }
 
-.right-panel {
+.middle-panel {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.right-panel {
+  width: 320px;
+  flex-shrink: 0;
   border-left: 1px solid #e0e0e0;
   background: #fbfbfa;
   overflow-y: auto;
