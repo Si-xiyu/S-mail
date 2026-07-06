@@ -12,9 +12,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -98,6 +102,42 @@ class MailboxServiceStateTransitionTest {
         assertThat(item.getFolder()).isEqualTo("INBOX");
         verify(categoryService).removeCategoryForUser(item.getMailId(), 1L, 40L);
         verify(categoryService, never()).assignCategory(item.getMailId(), 41L, "MANUAL");
+    }
+
+    @Test
+    void markingInboxMailReadDoesNotMoveOrDeleteIt() {
+        MailboxItem item = item(6L, "INBOX");
+        when(mailboxMapper.selectById(6L)).thenReturn(item);
+
+        service.markRead(6L, true);
+
+        assertThat(item.getReadFlag()).isTrue();
+        assertThat(item.getFolder()).isEqualTo("INBOX");
+        assertThat(item.getDeletedFlag()).isFalse();
+        verify(mailboxMapper).updateById(item);
+    }
+
+    @Test
+    void readingTrashMailDoesNotPostponeRetentionDeadline() {
+        LocalDateTime trashedAt = LocalDateTime.of(2026, 6, 1, 12, 0);
+        MailboxItem item = item(7L, "TRASH");
+        item.setUpdatedAt(trashedAt);
+        when(mailboxMapper.selectById(7L)).thenReturn(item);
+
+        service.markRead(7L, true);
+
+        assertThat(item.getUpdatedAt()).isEqualTo(trashedAt);
+        verify(mailboxMapper).updateById(item);
+    }
+
+    @Test
+    void purgeExpiredTrashUsesProvidedThirtyDayCutoff() {
+        LocalDateTime cutoff = LocalDateTime.of(2026, 6, 7, 3, 0);
+        when(mailboxMapper.softDeleteExpiredTrash(eq(cutoff), any(LocalDateTime.class))).thenReturn(2);
+
+        assertThat(service.purgeExpiredTrash(cutoff)).isEqualTo(2);
+
+        verify(mailboxMapper).softDeleteExpiredTrash(eq(cutoff), any(LocalDateTime.class));
     }
 
     private MailboxItem item(Long id, String folder) {

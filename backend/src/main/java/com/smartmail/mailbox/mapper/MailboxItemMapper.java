@@ -5,6 +5,7 @@ import com.smartmail.mailbox.entity.MailboxItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -230,6 +231,17 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
               AND received_at <= #{until}
             """)
     long countSince(Long userId, LocalDateTime since, LocalDateTime until);
+
+    @Update("""
+            UPDATE mailbox_item
+            SET deleted_flag = TRUE,
+                updated_at = #{deletedAt}
+            WHERE folder = 'TRASH'
+              AND deleted_flag = FALSE
+              AND updated_at <= #{cutoff}
+            """)
+    int softDeleteExpiredTrash(@Param("cutoff") LocalDateTime cutoff,
+                               @Param("deletedAt") LocalDateTime deletedAt);
 
     @Select("""
             <script>

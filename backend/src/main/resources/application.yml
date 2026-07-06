@@ -38,3 +38,6 @@ smartmail:
     timeout-seconds: 5
   storage:
     attachment-path: ${SMARTMAIL_STORAGE_PATH:./storage/attachments}
+  trash:
+    retention-days: ${SMARTMAIL_TRASH_RETENTION_DAYS:30}
+    cleanup-cron: "${SMARTMAIL_TRASH_CLEANUP_CRON:0 0 3 * * *}"

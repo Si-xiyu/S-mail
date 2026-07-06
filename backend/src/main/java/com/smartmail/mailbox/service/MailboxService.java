@@ -72,14 +72,18 @@ public class MailboxService {
     public void markRead(Long itemId, boolean read) {
         MailboxItem item = requireOwnedItem(itemId);
         item.setReadFlag(read);
-        item.setUpdatedAt(LocalDateTime.now());
+        if (!"TRASH".equals(item.getFolder())) {
+            item.setUpdatedAt(LocalDateTime.now());
+        }
         mailboxMapper.updateById(item);
     }
 
     public void star(Long itemId, boolean starred) {
         MailboxItem item = requireOwnedItem(itemId);
         item.setStarFlag(starred);
-        item.setUpdatedAt(LocalDateTime.now());
+        if (!"TRASH".equals(item.getFolder())) {
+            item.setUpdatedAt(LocalDateTime.now());
+        }
         mailboxMapper.updateById(item);
     }
 
@@ -144,6 +148,10 @@ public class MailboxService {
         }
         item.setUpdatedAt(LocalDateTime.now());
         mailboxMapper.updateById(item);
+    }
+
+    public int purgeExpiredTrash(LocalDateTime cutoff) {
+        return mailboxMapper.softDeleteExpiredTrash(cutoff, LocalDateTime.now());
     }
 
     public void changeCategory(Long itemId, Long categoryId) {
