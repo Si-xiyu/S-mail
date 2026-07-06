@@ -64,6 +64,33 @@ onMounted(async () => {
     try {
       const mailIdNum = parseInt(props.mailId, 10)
       mailThread.value = await mailStore.getMailPath(mailIdNum)
+
+      // 自动标记邮件为已读
+      const mail = mailStore.getMailById(props.mailId)
+      if (mail && !mail.read) {
+        await mailStore.markMailRead(mail.itemId, true)
+      }
+    } catch (err) {
+      console.error('Failed to load mail path:', err)
+    } finally {
+      threadLoading.value = false
+    }
+  }
+})
+
+// 监听 mailId 变化，加载新的对话路径并标记为已读
+watch(() => props.mailId, async (newMailId) => {
+  if (newMailId) {
+    threadLoading.value = true
+    try {
+      const mailIdNum = parseInt(newMailId, 10)
+      mailThread.value = await mailStore.getMailPath(mailIdNum)
+
+      // 自动标记邮件为已读
+      const mail = mailStore.getMailById(newMailId)
+      if (mail && !mail.read) {
+        await mailStore.markMailRead(mail.itemId, true)
+      }
     } catch (err) {
       console.error('Failed to load mail path:', err)
     } finally {

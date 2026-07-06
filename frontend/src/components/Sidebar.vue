@@ -114,7 +114,7 @@ const handleDeleteLabel = async (labelId: string) => {
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
           <span class="label-name">{{ label.name }}</span>
-          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <span v-if="mailStore.getUnreadCount(label.id) > 0" class="label-count">{{ mailStore.getUnreadCount(label.id) }}</span>
         </button>
       </div>
 
@@ -132,7 +132,7 @@ const handleDeleteLabel = async (labelId: string) => {
         >
           <span class="label-icon">{{ getLabelIcon(label.id) }}</span>
           <span class="label-name">{{ label.name }}</span>
-          <span v-if="label.count > 0" class="label-count">{{ label.count }}</span>
+          <span v-if="mailStore.getUnreadCount(label.id) > 0" class="label-count">{{ mailStore.getUnreadCount(label.id) }}</span>
           <button
             v-if="hoveredLabelId === label.id && !isProtectedLabel(label.name)"
             class="label-delete-btn"
