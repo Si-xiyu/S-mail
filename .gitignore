@@ -14,6 +14,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+.venv.bak/
+
+# Agent worktree
+agent/.worktree-main/
 
 # Environment and secrets
 .env
