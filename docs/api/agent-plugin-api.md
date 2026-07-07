@@ -118,9 +118,9 @@ Agent Plugin 返回的 `status`：
   "mailItemId": 88,
   "mail": {
     "mailId": 77,
-    "senderEmail": "teacher@smartmail.local",
+    "senderEmail": "teacher@smail.com",
     "senderDisplayName": "Teacher",
-    "recipients": ["demo@smartmail.local"],
+    "recipients": ["demo@smail.com"],
     "subject": "项目阶段汇报提醒",
     "contentText": "请各组在明天下午前提交项目进度，并准备 5 分钟演示。",
     "contentHtml": null,
@@ -140,8 +140,8 @@ Agent Plugin 返回的 `status`：
     { "id": 4, "name": "Junk Mail" }
   ],
   "behaviorSignals": {
-    "frequentSenders": ["teacher@smartmail.local"],
-    "recentRepliedSenders": ["teacher@smartmail.local"],
+    "frequentSenders": ["teacher@smail.com"],
+    "recentRepliedSenders": ["teacher@smail.com"],
     "recentMarkedJunkSenders": []
   },
   "pluginConfig": {

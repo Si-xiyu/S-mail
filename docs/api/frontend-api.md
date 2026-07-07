@@ -1,21 +1,16 @@
 # SmartMail 前端 API 文档
 
-> 本文档记录前端（Vue 3）所需的后端接口规范。
-> 
-> 参考资料：
-> - [MVP API 草案](mvp-api.md) - 完整的后端接口设计
-> - [Agent Plugin API](agent-plugin-api.md) - AI Agent 接口
+本文记录前端工作台应调用的后端公开 API。Agent 三方联调以 [agent-integration.md](./agent-integration.md) 为主；本文只覆盖 Frontend -> Backend Public API。
 
-## 基础配置
+## 基础约定
 
-- **Base URL**: 根据环境设置，默认 `/api/v1`
-- **认证方式**: JWT Bearer Token
-- **超时时间**: 5000ms
-- **Token 存储**: localStorage 中的 `smartmail_token`
+- Base URL：开发环境通过 Vite 代理访问 `/api/v1`。
+- 认证方式：`Authorization: Bearer <token>`。
+- Token 存储：`localStorage` 中的 `smartmail_token`。
+- 邮箱后缀：所有注册、登录、发信示例统一使用 `@smail.com`。
+- 前端不得直接调用 Agent 的 `http://127.0.0.1:8000/plugin/v1/**`。
 
-## 响应格式规范
-
-所有 API 响应遵循统一格式：
+后端统一响应：
 
 ```json
 {
@@ -25,304 +20,169 @@
 }
 ```
 
-**错误码规约**:
-- `0` - 成功
-- `400` - 请求参数错误
-- `401` - 未授权（无效或过期的 Token）
-- `403` - 禁止访问
-- `404` - 资源不存在
-- `500` - 服务器内部错误
+## Auth API
 
-## 认证模块 (`/auth`)
+### POST `/api/v1/auth/register`
 
-### 用户登录
-
-```http
-POST /api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-**返回示例**:
 ```json
 {
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "token": "eyJhbGc...",
-    "userId": 1,
-    "email": "user@example.com",
-    "username": "John Doe"
-  }
+  "email": "demo@smail.com",
+  "username": "Demo",
+  "password": "123456"
 }
 ```
 
-### 用户注册
+### POST `/api/v1/auth/login`
 
-```http
-POST /api/v1/auth/register
-Content-Type: application/json
-
-{
-  "email": "newuser@example.com",
-  "username": "New User",
-  "password": "password123"
-}
-```
-
-**返回示例**:
 ```json
 {
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "token": "eyJhbGc...",
-    "userId": 2,
-    "email": "newuser@example.com",
-    "username": "New User"
-  }
+  "email": "demo@smail.com",
+  "password": "123456"
 }
 ```
 
-## 邮箱模块 (`/mailbox`)
+响应 `data`：
 
-### 获取邮箱列表
-
-```http
-GET /api/v1/mailbox?folder=INBOX
-Authorization: Bearer {token}
-```
-
-**Query 参数**:
-- `folder` (string): 文件夹类型，可选值：`INBOX`, `SENT`, `DRAFTS`, `TRASH`, `SPAM`, `STARRED`
-
-**返回示例**:
 ```json
 {
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "records": [
-      {
-        "itemId": 1,
-        "mailId": 1,
-        "senderEmail": "sender@example.com",
-        "subject": "邮件主题",
-        "preview": "邮件预览内容...",
-        "folder": "INBOX",
-        "read": false,
-        "starred": true,
-        "priority": "HIGH",
-        "hasAttachment": true,
-        "receivedAt": "2026-06-13T10:30:00Z"
-      }
-    ]
-  }
+  "token": "jwt-token",
+  "userId": 1,
+  "email": "demo@smail.com",
+  "username": "Demo"
 }
 ```
 
-## 邮件模块 (`/mails`)
+## Workspace API
 
-### 获取邮件详情
+前端主体验应优先使用 Workspace API。
 
 ```http
-GET /api/v1/mails/{mailId}
-Authorization: Bearer {token}
+GET /api/v1/workspace/views
+GET /api/v1/workspace/mail-items?view=inbox&keyword=项目&page=1&pageSize=20
+GET /api/v1/workspace/mail-items/{itemId}
 ```
 
-**返回示例**:
-```json
-{
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "itemId": 1,
-    "mailId": 1,
-    "messageNo": "MSG-20260613-001",
-    "senderEmail": "sender@example.com",
-    "subject": "邮件主题",
-    "preview": "邮件预览...",
-    "contentText": "完整邮件文本内容...",
-    "contentHtml": "<p>HTML 格式内容</p>",
-    "folder": "INBOX",
-    "read": true,
-    "starred": false,
-    "priority": "NORMAL",
-    "recipients": ["recipient@example.com"],
-    "hasAttachment": true,
-    "receivedAt": "2026-06-13T10:30:00Z",
-    "aiResults": []
-  }
-}
-```
+列表项核心字段：
 
-### 发送邮件
-
-```http
-POST /api/v1/mails
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "to": ["recipient@example.com"],
-  "cc": ["cc@example.com"],
-  "subject": "邮件主题",
-  "contentText": "邮件正文（纯文本）",
-  "contentHtml": "<p>邮件正文（HTML）</p>"
-}
-```
-
-**返回示例**:
-```json
-{
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "mailId": 123,
-    "messageNo": "MSG-20260613-123"
-  }
-}
-```
-
-## AI 模块 (`/ai`)
-
-### 运行 AI 任务
-
-```http
-POST /api/v1/ai/mails/{mailId}/{task}
-Authorization: Bearer {token}
-```
-
-**Path 参数**:
-- `mailId` (number): 邮件 ID
-- `task` (string): 任务类型，可选值：
-  - `summary` - 生成邮件摘要
-  - `reply-draft` - 生成回复草稿
-  - `analyze` - 分析邮件优先级和标签建议
-
-**返回示例**:
-```json
-{
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "task": "summary",
-    "status": "COMPLETED",
-    "result": {
-      "summary": ["要点一", "要点二"],
-      "priority": "HIGH",
-      "labels": ["标签1", "标签2"]
-    },
-    "steps": [
-      {
-        "name": "Parse",
-        "detail": "解析邮件内容"
-      },
-      {
-        "name": "Generate",
-        "detail": "生成 AI 结果"
-      }
-    ]
-  }
-}
-```
-
-## 前端数据类型定义
-
-### UserProfile
 ```typescript
-interface UserProfile {
-  id: number
-  email: string
-  username: string
-}
-```
-
-### MailboxItem
-```typescript
-interface MailboxItem {
+interface WorkspaceMailItem {
   itemId: number
   mailId: number
+  folder: 'INBOX' | 'SENT' | 'DRAFTS' | 'TRASH' | 'JUNK'
   senderEmail: string
   subject: string
-  preview: string
-  folder: string
+  summaryPreview?: string
+  category?: { id: number; name: string; color?: string }
+  analysisStatus?: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'DISABLED'
+  riskLevel?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
   read: boolean
   starred: boolean
-  priority: string
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+  priorityScore?: number
   hasAttachment: boolean
   receivedAt: string
 }
 ```
 
-### MailDetail
-```typescript
-interface MailDetail extends MailboxItem {
-  messageNo: string
-  contentText: string
-  contentHtml?: string
-  recipients: string[]
-  aiResults: Array<Record<string, unknown>>
+详情接口使用 `itemId`，不是 `mailId`：
+
+```http
+GET /api/v1/workspace/mail-items/101
+```
+
+## Compose 与邮件发送
+
+### POST `/api/v1/compose/attachments`
+
+请求：`multipart/form-data`。响应 `data.pendingAttachmentId`。
+
+### POST `/api/v1/mails/send`
+
+```json
+{
+  "to": ["alice@smail.com"],
+  "cc": [],
+  "bcc": [],
+  "subject": "SmartMail MVP 联调",
+  "contentText": "这是一封测试邮件。",
+  "contentHtml": null,
+  "pendingAttachmentIds": [],
+  "parentMailId": null
 }
 ```
 
-### SendMailPayload
-```typescript
-interface SendMailPayload {
-  to: string[]
-  cc: string[]
-  subject: string
-  contentText: string
-  contentHtml?: string
+## Mailbox 操作
+
+```http
+PATCH  /api/v1/mailbox/items/{itemId}/read
+PATCH  /api/v1/mailbox/items/{itemId}/star
+PATCH  /api/v1/mailbox/items/{itemId}/category
+POST   /api/v1/mailbox/items/{itemId}/move
+DELETE /api/v1/mailbox/items/{itemId}
+```
+
+示例：
+
+```json
+{ "read": true }
+```
+
+```json
+{ "folder": "JUNK" }
+```
+
+## Agent Public API
+
+前端只调用后端公开 Agent API。
+
+创建当前邮件会话：
+
+```json
+{
+  "scope": "CURRENT_MAIL",
+  "context": { "mailItemId": 101 }
 }
 ```
 
-### AgentTaskResponse
-```typescript
-interface AgentTaskResponse {
-  task: string
-  status: string
-  result: Record<string, unknown>
-  steps?: Array<{ name: string; detail: string }>
+创建全局会话：
+
+```json
+{
+  "scope": "GLOBAL",
+  "context": {}
 }
 ```
 
-## 错误处理
+发送消息时字段名是 `message`：
 
-所有 API 响应遵循统一格式（见"响应格式规范"）。
+```json
+{
+  "message": "这封邮件需要我做什么？"
+}
+```
 
-## Workspace API（推荐前端使用）
+确认写操作：
 
-参考 [MVP API 草案](mvp-api.md) 的 **Section 3: Workspace API**
+```http
+POST /api/v1/agent/actions/{actionId}/confirm
+```
 
-### GET `/api/v1/workspace/views`
+```json
+{ "confirmed": true }
+```
 
-返回左侧工作区导航需要的所有数据（views、folders、categories）。
+## Settings 与 AI 状态
 
-### GET `/api/v1/workspace/mail-items`
+```http
+GET   /api/v1/users/me
+PATCH /api/v1/users/me/settings
+POST  /api/v1/analysis/mail-items/{itemId}/retry
+```
 
-获取邮件列表（支持分页、排序、过滤）。
+AI 关闭时，基础邮件能力仍应可用；前端应隐藏或弱化摘要、分类建议和 Agent 入口。
 
-### GET `/api/v1/workspace/mail-detail/{mailId}`
+## 相关文档
 
-获取单个邮件的详细信息。
-
-## 前端 Mock 策略
-
-前端 API 客户端（`src/api/client.ts`）配备了降级方案：
-
-- 开发阶段，若接口连接失败会返回 Mock 数据
-- Mock 数据存储在客户端，可快速演示功能
-- 后端启动后，自动切换到真实接口
-
-## 相关文件
-
-- 前端 API 客户端: `frontend/src/api/client.ts`
-- 前端类型定义: `frontend/src/types/mail.ts`
-- 前端存储: `frontend/src/stores/mailStore.ts`
-- 后端完整 API: [MVP API 草案](mvp-api.md)
-- AI 接口: [Agent Plugin API](agent-plugin-api.md)
+- [agent-integration.md](./agent-integration.md)：三方联调主文档。
+- [mvp-api.md](./mvp-api.md)：完整 API 草案。
+- [agent-plugin-api.md](./agent-plugin-api.md)：后端与 Agent Plugin 契约。
