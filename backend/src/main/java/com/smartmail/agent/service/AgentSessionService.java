@@ -86,7 +86,7 @@ public class AgentSessionService {
     public AgentSessionResponse createSession(CreateAgentSessionRequest request) {
         Long userId = UserContext.requireUserId();
         String scope = normalizeScope(request == null ? null : request.scope());
-        Map<String, Object> context = request == null || request.context() == null ? Map.of() : request.context();
+        Map<String, Object> context = request == null ? Map.of() : request.resolvedContext();
         LocalDateTime now = LocalDateTime.now();
 
         AgentSession session = new AgentSession();
@@ -111,7 +111,7 @@ public class AgentSessionService {
     public AgentMessageResponse sendMessage(String sessionId, AgentMessageRequest request) {
         Long userId = UserContext.requireUserId();
         AgentSession session = requireSession(sessionId, userId);
-        String message = request == null ? null : request.message();
+        String message = request == null ? null : request.resolvedMessage();
         if (message == null || message.isBlank()) {
             throw new BusinessException(400, "message is required");
         }
@@ -180,7 +180,7 @@ public class AgentSessionService {
         request.put("message", message);
         request.put("context", jsonToMap(session.getContextJson()));
         request.put("toolPolicy", Map.of("agentAutoWriteEnabled", Boolean.TRUE.equals(setting.getAgentAutoWriteEnabled())));
-        request.put("pluginConfig", Map.of("aiPluginEnabled", Boolean.TRUE.equals(setting.getAiEnabled())));
+        request.put("pluginConfig", Map.of("aiPluginEnabled", agentEnabled && Boolean.TRUE.equals(setting.getAiEnabled())));
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Plugin-Token", pluginToken);

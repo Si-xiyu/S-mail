@@ -54,7 +54,7 @@ class WorkspaceServiceBehaviorTest {
                 assignmentMapper,
                 attachmentMapper
         );
-        UserContext.set(new CurrentUser(1L, "user@smartmail.local", "User"));
+        UserContext.set(new CurrentUser(1L, "user@smail.com", "User"));
     }
 
     @AfterEach
@@ -117,7 +117,7 @@ class WorkspaceServiceBehaviorTest {
     private MailMessage mailMessage(Long id, String subject) {
         MailMessage message = new MailMessage();
         message.setId(id);
-        message.setSenderEmail("sender@smartmail.local");
+        message.setSenderEmail("sender@smail.com");
         message.setSubject(subject);
         message.setContentText("Message body for " + subject);
         message.setHasAttachment(false);
