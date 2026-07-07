@@ -2,27 +2,43 @@
 
 Python FastAPI Agent service for SmartMail. It is optional: when the backend AI switch is off, SmartMail still runs as a traditional mailbox.
 
-## Run
+## Run with project script
+
+Recommended local startup from repository root:
 
 ```powershell
-cd agent
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+.\scripts\start-agent.ps1
 ```
 
-## Provider config
-
-Copy the example config and provide API keys through environment variables:
+If you need to select a specific Python executable:
 
 ```powershell
-Copy-Item config/providers.example.toml config/providers.toml
-$env:SMARTMAIL_AGENT_CONFIG = "./config/providers.toml"
-$env:DEEPSEEK_API_KEY = "sk-..."
+.\scripts\start-agent.ps1 -Python "E:\software\Miniconda\python.exe"
 ```
 
-`config/providers.toml` separates automatic analysis and interactive chat:
+The script automatically:
+
+- creates `agent/.env` from `.env.example` if missing;
+- creates `agent/config/providers.toml` from `providers.example.toml` if missing;
+- starts Uvicorn with `--env-file .env`;
+- serves the plugin at `http://127.0.0.1:8000`.
+
+## Local config
+
+Put runtime values and secrets in `agent/.env`:
+
+```env
+SMARTMAIL_BACKEND_BASE_URL=http://localhost:8080
+SMARTMAIL_INTERNAL_TOKEN=smartmail-internal-dev-token
+SMARTMAIL_PLUGIN_TOKEN=smartmail-agent-plugin-dev-token
+SMARTMAIL_AGENT_CONFIG=./config/providers.toml
+DEEPSEEK_API_KEY=sk-...
+SMARTMAIL_AGENT_RAG_MODE=BACKEND
+SMARTMAIL_AGENT_MOCK_ON_TOOL_ERROR=false
+SMARTMAIL_LOG_LEVEL=INFO
+```
+
+`config/providers.toml` stores provider metadata and points to the environment variable that contains the secret:
 
 ```toml
 [providers.deepseek]
@@ -41,7 +57,17 @@ model = "deepseek-chat"
 timeout_seconds = 30
 ```
 
-This follows the same operational pattern as Claude Code / Codex style custom provider config: the file stores provider metadata and the environment variable name, while the real secret stays outside Git.
+Do not commit `.env` or `config/providers.toml`.
+
+## Manual run fallback
+
+If you do not use the project script:
+
+```powershell
+cd agent
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --env-file .env
+```
 
 ## Plugin API Contract
 
