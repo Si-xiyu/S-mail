@@ -1,0 +1,16 @@
+# Copy to providers.toml. Keep secrets in environment variables.
+
+[providers.deepseek]
+base_url = https://api.deepseek.com
+model = deepseek-chat
+api_key_env = DEEPSEEK_API_KEY
+
+[features.analysis]
+provider = deepseek
+model = deepseek-chat
+timeout_seconds = 15
+
+[features.chat]
+provider = deepseek
+model = deepseek-chat
+timeout_seconds = 30

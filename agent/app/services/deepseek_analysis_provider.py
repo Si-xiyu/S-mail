@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -10,7 +10,7 @@ from app.services.analysis_provider import RulesAnalysisProvider
 
 class DeepSeekAnalysisProvider:
     def __init__(self, deepseek_client: DeepSeekClient | None = None) -> None:
-        self.client = deepseek_client or DeepSeekClient()
+        self.client = deepseek_client or DeepSeekClient(feature="analysis")
         self.fallback = RulesAnalysisProvider()
 
     def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
@@ -32,7 +32,7 @@ class DeepSeekAnalysisProvider:
     def model_info(self, request: AnalysisRequest) -> ModelInfo:
         return ModelInfo(
             provider="DEEPSEEK",
-            model=settings.deepseek_model,
+            model=settings.analysis.model,
             mode="llm",
             llmEnabled=True,
             ragTool=settings.rag_mode,
@@ -57,7 +57,7 @@ class DeepSeekAnalysisProvider:
         response = self.fallback.analyze(request)
         response.model_info.provider = "DEEPSEEK"
         response.model_info.mode = "rules-fallback"
-        response.model_info.llm_enabled = bool(request.plugin_config.api_key or settings.llm_api_key)
+        response.model_info.llm_enabled = bool(request.plugin_config.api_key or settings.api_key_for("analysis"))
         response.model_info.fallback_used = True
         return response
 

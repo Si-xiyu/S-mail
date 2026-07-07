@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Literal
 
@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 PluginScope = Literal["CURRENT_MAIL", "GLOBAL"]
 PluginStatus = Literal["SUCCEEDED", "DISABLED", "PARTIAL", "FAILED"]
-MailActionType = Literal["SET_PRIORITY", "SET_CATEGORY", "MOVE_TO_JUNK", "MARK_READ"]
+MailActionType = Literal["SET_PRIORITY", "SET_CATEGORY", "MOVE_TO_JUNK", "MARK_READ", "MOVE"]
 ActionExecutionStatus = Literal["DELEGATED", "DISABLED", "REJECTED", "FAILED"]
 ActionExecutionMode = Literal["BACKEND_REQUIRED", "NONE"]
 

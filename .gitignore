@@ -22,6 +22,7 @@ agent/.worktree-main/
 # Environment and secrets
 .env
 *.local
+agent/config/providers.toml
 
 # IDE / OS
 .idea/

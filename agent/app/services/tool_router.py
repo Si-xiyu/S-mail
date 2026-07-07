@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
+from app.llm.deepseek_client import DeepSeekClient, DeepSeekError
 from app.schemas.plugin import (
     BackendOperation,
     ConfirmedActionExecuteRequest,
@@ -17,6 +19,7 @@ from app.tools.backend_tools import BackendToolClient, to_mail_context
 
 BACKEND_ACTION_EXECUTE_PATH = "/internal/v1/tools/mail-actions/execute"
 ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any], str]] = {
+    "MOVE": ("MOVE", {"folder": "TRASH"}, "移入回收站"),
     "MOVE_TO_JUNK": ("MOVE_TO_JUNK", {}, "移入 Junk"),
     "MARK_READ": ("MARK_READ", {"read": True}, "标记为已读"),
     "SET_PRIORITY": ("SET_PRIORITY", {"priority": "HIGH"}, "标记为高优先级"),
@@ -28,6 +31,7 @@ class ToolRouter:
     def __init__(self) -> None:
         self.backend_tools = BackendToolClient()
         self.rag_tool = RagTool()
+        self.chat_model = DeepSeekClient(feature="chat")
 
     def chat(self, request: PluginChatRequest) -> PluginChatResponse:
         if not _plugin_enabled(request.plugin_config):
@@ -67,6 +71,13 @@ class ToolRouter:
                 execution="NONE",
                 message="SET_CATEGORY 必须提供 categoryId。",
             )
+        if request.type == "MOVE" and str(payload.get("folder") or "").upper() not in {"INBOX", "JUNK", "TRASH"}:
+            return ConfirmedActionExecuteResponse(
+                status="REJECTED",
+                actionId=request.action_id,
+                execution="NONE",
+                message="MOVE 必须提供 folder，且只能是 INBOX/JUNK/TRASH。",
+            )
 
         if not request.confirmed and not _auto_write_enabled(request.tool_policy):
             return ConfirmedActionExecuteResponse(
@@ -92,6 +103,29 @@ class ToolRouter:
     # Current mail
     # ------------------------------------------------------------------
     def _handle_current_mail(self, request: PluginChatRequest) -> PluginChatResponse:
+        action_type, _, _ = _detect_action(request.message)
+        if action_type is not None:
+            if _mail_item_id_from_context(request.context) is None:
+                return PluginChatResponse(
+                    status="FAILED",
+                    answer="写操作需要 mailItemId 上下文，但未提供。",
+                    tool_calls=[],
+                )
+            pending_actions = self._mail_action_tool(request)
+            return PluginChatResponse(
+                status="SUCCEEDED",
+                answer=_describe_pending_actions(pending_actions),
+                tool_calls=[
+                    ToolCallRecord(
+                        tool="mail_action_tool",
+                        status="PENDING",
+                        input={"message": request.message, "autoWrite": _auto_write_enabled(request.tool_policy)},
+                        output={"pendingActions": [action.model_dump(by_alias=True) for action in pending_actions]},
+                    )
+                ],
+                pending_actions=pending_actions,
+            )
+
         mail_result = self.backend_tools.get_current_mail_context(request.context, request.user_id)
         tool_call = ToolCallRecord(
             tool="mail_context_tool",
@@ -110,36 +144,16 @@ class ToolRouter:
             )
 
         mail = to_mail_context(mail_result.data)
-
-        # Write intent: only generate whitelisted pending actions.
-        action_type, _, _ = _detect_action(request.message)
-        if action_type is not None and _mail_item_id_from_context(request.context) is None:
-            return PluginChatResponse(
-                status="FAILED",
-                answer="写操作需要 mailItemId 上下文，但未提供。",
-                tool_calls=[tool_call],
-            )
-
-        pending_actions = self._mail_action_tool(request)
-        if pending_actions:
-            return PluginChatResponse(
-                status="SUCCEEDED",
-                answer=_describe_pending_actions(pending_actions),
-                tool_calls=[
-                    tool_call,
-                    ToolCallRecord(
-                        tool="mail_action_tool",
-                        status="PENDING",
-                        input={"message": request.message, "autoWrite": _auto_write_enabled(request.tool_policy)},
-                        output={"pendingActions": [action.model_dump(by_alias=True) for action in pending_actions]},
-                    ),
-                ],
-                pending_actions=pending_actions,
-            )
+        answer = _answer_current_mail(request.message, mail.subject, mail.sender_email, mail.content_text)
+        if self.chat_model.available():
+            try:
+                answer = self.chat_model.answer_current_mail(request.message, mail_result.data)
+            except DeepSeekError:
+                pass
 
         return PluginChatResponse(
             status="SUCCEEDED",
-            answer=_answer_current_mail(request.message, mail.subject, mail.sender_email, mail.content_text),
+            answer=answer,
             tool_calls=[tool_call],
         )
 
@@ -164,12 +178,12 @@ class ToolRouter:
             if auto_write
             else "agentAutoWriteEnabled=false，需要用户在界面确认。"
         )
-        full_payload = {**payload, "mailItemId": mail_item_id, "userId": request.user_id}
+        full_payload = {**payload, "mailItemId": mail_item_id, "userId": request.user_id, "action": action_type}
         return [
             PendingAction(
                 actionId=_action_id(request.session_id, action_type, mail_item_id),
                 type=action_type,
-                label=label,
+                label=label or action_type,
                 payload=full_payload,
                 reason=reason,
                 status="PENDING",
@@ -181,34 +195,70 @@ class ToolRouter:
     # Global
     # ------------------------------------------------------------------
     def _handle_global(self, request: PluginChatRequest) -> PluginChatResponse:
+        action_type, payload, label = _detect_action(request.message)
+        query = _extract_search_query(request.message)
+        if self.chat_model.available():
+            try:
+                query = self.chat_model.extract_search_query(request.message)
+            except DeepSeekError:
+                pass
+
         search_result = self.backend_tools.search_mail(
             request.user_id,
-            request.message,
+            query,
             folder=None,
-            limit=5,
+            limit=10 if action_type else 5,
         )
 
         records: list[dict[str, Any]] = []
         if search_result.ok and isinstance(search_result.data, list):
-            records = search_result.data[:5]
+            records = search_result.data[:10]
 
         if records:
             tool_call = ToolCallRecord(
                 tool="mail_search_tool",
                 status="SUCCEEDED",
-                input={"query": request.message, "limit": 5},
+                input={"query": query, "limit": 10 if action_type else 5},
                 output={"records": records, "source": "BACKEND"},
                 source="BACKEND",
             )
-            answer = _answer_from_records(request.message, records)
-        else:
-            records, tool_call = self.rag_tool.search(request.message, request.context)
-            answer = (
-                "暂未从后端检索到相关邮件，当前返回 mock 示例结果。"
-                "完整邮箱问答将在接入 BM25 + 向量检索后提供。"
-                f"\n示例匹配: {', '.join(r.get('title') or r.get('subject') or 'unknown' for r in records)}。"
-            )
+            if action_type:
+                pending_actions = _pending_actions_from_records(
+                    request=request,
+                    records=records,
+                    action_type=action_type,
+                    payload=payload,
+                    label=label or action_type,
+                )
+                return PluginChatResponse(
+                    status="SUCCEEDED",
+                    answer=_describe_bulk_pending_actions(pending_actions, query),
+                    tool_calls=[
+                        tool_call,
+                        ToolCallRecord(
+                            tool="mail_action_tool",
+                            status="PENDING" if pending_actions else "FAILED",
+                            input={"message": request.message, "query": query},
+                            output={"pendingActions": [a.model_dump(by_alias=True) for a in pending_actions]},
+                        ),
+                    ],
+                    pending_actions=pending_actions,
+                )
 
+            answer = _answer_from_records(request.message, records)
+            if self.chat_model.available():
+                try:
+                    answer = self.chat_model.answer_search_results(request.message, records)
+                except DeepSeekError:
+                    pass
+            return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
+
+        records, tool_call = self.rag_tool.search(query, request.context)
+        answer = (
+            "暂未从后端检索到相关邮件，当前返回 mock 示例结果。"
+            "完整邮箱问答将在接入 BM25 + 向量检索后提供。"
+            f"\n示例匹配: {', '.join(r.get('title') or r.get('subject') or 'unknown' for r in records)}。"
+        )
         return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
 
 
@@ -226,31 +276,58 @@ def _auto_write_enabled(tool_policy: dict[str, Any]) -> bool:
 def _detect_action(message: str) -> tuple[Any, dict[str, Any], str | None]:
     text = message.lower()
 
-    # Junk / spam
+    if any(word in text for word in ("删", "删除", "delete", "remove", "trash", "回收站")):
+        return ACTION_KEYWORDS["MOVE"]
+
     if any(word in text for word in ("垃圾", "junk", "spam", "广告")) and any(
-        word in text for word in ("移", "move", "标为", "mark", "删", "delete")
+        word in text for word in ("移", "move", "标为", "mark")
     ):
         return ACTION_KEYWORDS["MOVE_TO_JUNK"]
 
-    # Read
     if any(word in text for word in ("已读", "read")) and any(
         word in text for word in ("标", "mark", "设", "set")
     ):
         return ACTION_KEYWORDS["MARK_READ"]
 
-    # Priority
     if any(word in text for word in ("优先级", "priority", "重要", "urgent", "高优先级")) and any(
         word in text for word in ("设", "set", "标", "mark", "改", "提升")
     ):
         return ACTION_KEYWORDS["SET_PRIORITY"]
 
-    # Category
     if any(word in text for word in ("分类", "category", "标签", "label")) and any(
         word in text for word in ("设", "set", "标", "mark", "加", "add", "移到", "move")
     ):
         return ACTION_KEYWORDS["SET_CATEGORY"]
 
     return None, {}, None
+
+
+def _extract_search_query(message: str) -> str:
+    text = message.strip()
+    patterns = [
+        r"(?:搜索|查找|找)(.+?)(?:的)?邮件",
+        r"(?:search|find)\s+(.+?)(?:\s+mail|\s+email|$)",
+        r"把(.+?)(?:邮件)?(?:删|删除|移|标)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return _clean_query(match.group(1)) or text
+
+    cleaned = _clean_query(text)
+    return cleaned or text
+
+
+def _clean_query(value: str) -> str:
+    cleaned = value.strip()
+    replacements = (
+        "帮我", "请", "一下", "邮件", "邮箱", "搜索", "查找", "找", "删除", "删掉",
+        "删", "移到", "移动", "标记", "标为", "的", "about", "emails", "email", "mail",
+    )
+    for token in replacements:
+        cleaned = cleaned.replace(token, " ")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ，,。.")
+    return cleaned
 
 
 def _mail_item_id_from_context(context: dict[str, Any]) -> Any:
@@ -268,7 +345,37 @@ def _normalized_action_payload(payload: dict[str, Any]) -> dict[str, Any]:
         normalized.pop(legacy_key, None)
     if mail_item_id is not None:
         normalized["mailItemId"] = mail_item_id
+    if normalized.get("folder") is not None:
+        normalized["folder"] = str(normalized["folder"]).upper()
     return normalized
+
+
+def _pending_actions_from_records(
+    request: PluginChatRequest,
+    records: list[dict[str, Any]],
+    action_type: str,
+    payload: dict[str, Any],
+    label: str,
+) -> list[PendingAction]:
+    actions: list[PendingAction] = []
+    for record in records[:10]:
+        mail_item_id = _mail_item_id_from_context(record) or record.get("itemId") or record.get("id")
+        if mail_item_id is None:
+            continue
+        full_payload = {**payload, "mailItemId": mail_item_id, "userId": request.user_id, "action": action_type}
+        subject = record.get("subject") or record.get("title") or "无主题"
+        actions.append(
+            PendingAction(
+                actionId=_action_id(request.session_id, action_type, mail_item_id),
+                type=action_type,
+                label=f"{label}: {subject}",
+                payload=full_payload,
+                reason="全局 Agent 已检索候选邮件；写操作需要用户确认后由后端执行。",
+                status="PENDING",
+                execution="BACKEND_REQUIRED",
+            )
+        )
+    return actions
 
 
 def _action_id(session_id: str, action_type: str, mail_item_id: Any) -> str:
@@ -312,6 +419,12 @@ def _describe_pending_actions(actions: list[PendingAction]) -> str:
         return "已准备好操作，等待确认。"
     labels = ", ".join(action.label for action in actions)
     return f"我可以帮你执行以下操作：{labels}。请在界面确认后由后端执行。"
+
+
+def _describe_bulk_pending_actions(actions: list[PendingAction], query: str) -> str:
+    if not actions:
+        return f"已搜索「{query}」，但没有可执行的候选邮件。"
+    return f"已搜索「{query}」，找到 {len(actions)} 封候选邮件。我已生成待确认操作，请确认后由后端执行。"
 
 
 def _answer_from_records(message: str, records: list[dict[str, Any]]) -> str:

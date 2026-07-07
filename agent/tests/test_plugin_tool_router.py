@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
+from app.schemas.agent import ToolResult
 from app.schemas.plugin import PluginChatRequest
 from app.services.tool_router import ToolRouter
 from app.tools.backend_tools import BackendToolClient, to_mail_context
@@ -114,6 +115,32 @@ class ToolRouterTest(unittest.TestCase):
         self.assertNotIn("category", response.pending_actions[0].payload)
 
 
+    def test_global_delete_ad_mail_creates_trash_pending_actions(self) -> None:
+        with patch.object(self.router.backend_tools, "search_mail", return_value=ToolResult(ok=True, data=[
+            {
+                "mailItemId": 88,
+                "subject": "Big discount ad",
+                "senderEmail": "ads@example.com",
+                "snippet": "limited promotion",
+            }
+        ])) as search_mail:
+            response = self.router.chat(
+                PluginChatRequest(
+                    sessionId="s1",
+                    userId=1,
+                    scope="GLOBAL",
+                    message="帮我把广告邮件删掉",
+                    toolPolicy={"agentAutoWriteEnabled": False},
+                )
+            )
+
+        self.assertEqual(response.status, "SUCCEEDED")
+        search_mail.assert_called_once()
+        self.assertEqual(response.pending_actions[0].type, "MOVE")
+        self.assertEqual(response.pending_actions[0].payload["mailItemId"], 88)
+        self.assertEqual(response.pending_actions[0].payload["folder"], "TRASH")
+        self.assertEqual(response.pending_actions[0].payload["action"], "MOVE")
+        self.assertIn("确认", response.answer)
 class BackendToolClientTest(unittest.TestCase):
     def setUp(self) -> None:
         self.client = BackendToolClient()
