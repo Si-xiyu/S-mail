@@ -128,6 +128,64 @@ export interface AgentTaskResponse {
   steps?: Array<{ name: string; detail: string }>
 }
 
+export type AgentScope = 'GLOBAL' | 'CURRENT_MAIL'
+
+export interface AgentMessageView {
+  role: 'USER' | 'ASSISTANT' | string
+  content: string
+  status: string
+  toolCalls?: Array<Record<string, unknown>>
+  createdAt?: string
+}
+
+export interface PendingAgentAction {
+  actionId: string
+  type: string
+  label: string
+  payload?: Record<string, unknown>
+  reason?: string
+  status: 'PENDING' | 'EXECUTED' | 'CANCELLED' | string
+  execution?: string
+}
+
+export interface CreateAgentSessionRequest {
+  scope: AgentScope
+  context?: Record<string, unknown>
+}
+
+export interface AgentSessionResponse {
+  sessionId: string
+  scope: AgentScope
+  context: Record<string, unknown>
+  status: string
+  messages: AgentMessageView[]
+  pendingActions: PendingAgentAction[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AgentMessageRequest {
+  message: string
+}
+
+export interface AgentMessageResponse {
+  sessionId: string
+  status: string
+  answer: string
+  assistantMessage: AgentMessageView
+  pendingActions: PendingAgentAction[]
+}
+
+export interface ConfirmAgentActionRequest {
+  confirmed: boolean
+}
+
+export interface ConfirmAgentActionResponse {
+  actionId: string
+  status: string
+  message: string
+}
+
 // ============ Workspace API ============
 /**
  * 工作区视图项 - 对应后端 WorkspaceView

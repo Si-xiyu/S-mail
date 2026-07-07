@@ -2,13 +2,17 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Mail, MailItem, User, Label } from '../types'
 import type {
+  AgentMessageResponse,
+  AgentSessionResponse,
+  ConfirmAgentActionResponse,
   MailboxItem,
   MailDetail,
   MailSendResponse,
   NotificationPollResponse,
   SendMailPayload,
   ThreadMessage,
-  UserProfile
+  UserProfile,
+  UserSettings
 } from '../types/mail'
 import * as apiClient from '../api/client'
 
@@ -49,7 +53,16 @@ export const useMailStore = defineStore('mail', () => {
   const searchQuery = ref('')
   const unreadCount = ref(0)
 
+  // 用户 AI 设置
+  const userSettings = ref<UserSettings | null>(null)
+
   // ============ 计算属性 ============
+
+  // AI 功能是否启用（用户设置 + 后端开关）
+  const aiEnabled = computed((): boolean => {
+    // 默认开启，直到后端明确返回禁用
+    return userSettings.value?.aiEnabled !== false
+  })
 
   // 获取当前标签的邮件列表
   const currentMailItems = computed((): MailboxItem[] => {
@@ -93,6 +106,7 @@ export const useMailStore = defineStore('mail', () => {
         email: userProfile.email,
         name: userProfile.username
       }
+      userSettings.value = userProfile.settings ?? { aiEnabled: true, agentAutoWriteEnabled: false }
       localStorage.setItem('smartmail_user', JSON.stringify(user.value))
       await loadMailbox('INBOX')
       // 加载分类
@@ -118,6 +132,7 @@ export const useMailStore = defineStore('mail', () => {
         email: userProfile.email,
         name: userProfile.username
       }
+      userSettings.value = userProfile.settings ?? { aiEnabled: true, agentAutoWriteEnabled: false }
       localStorage.setItem('smartmail_user', JSON.stringify(user.value))
       await loadMailbox('INBOX')
       // 加载分类
@@ -137,6 +152,7 @@ export const useMailStore = defineStore('mail', () => {
     localStorage.removeItem('smartmail_token')
     localStorage.removeItem('smartmail_user')
     user.value = null
+    userSettings.value = null
     mailboxItems.value = []
     mailDetailCache.value.clear()
     currentLabel.value = 'INBOX'
@@ -160,6 +176,7 @@ export const useMailStore = defineStore('mail', () => {
         email: profile.email,
         name: profile.username
       }
+      userSettings.value = profile.settings ?? { aiEnabled: true, agentAutoWriteEnabled: false }
       localStorage.setItem('smartmail_user', JSON.stringify(user.value))
       await Promise.all([loadMailbox('INBOX', 1, 20, true), initializeCategories()])
       return true
@@ -690,6 +707,57 @@ export const useMailStore = defineStore('mail', () => {
   }
 
   /**
+   * 创建 Agent 会话
+   */
+  const createAgentSession = async (
+    scope: 'GLOBAL' | 'CURRENT_MAIL',
+    context?: Record<string, unknown>
+  ): Promise<AgentSessionResponse> => {
+    return await apiClient.createAgentSession(scope, context)
+  }
+
+  /**
+   * 获取 Agent 会话
+   */
+  const getAgentSession = async (sessionId: string): Promise<AgentSessionResponse> => {
+    return await apiClient.getAgentSession(sessionId)
+  }
+
+  /**
+   * 向 Agent 会话发送消息
+   */
+  const sendAgentMessage = async (
+    sessionId: string,
+    message: string
+  ): Promise<AgentMessageResponse> => {
+    return await apiClient.sendAgentMessage(sessionId, message)
+  }
+
+  /**
+   * 确认或取消 Agent 待确认动作
+   */
+  const confirmAgentAction = async (
+    actionId: string,
+    confirmed: boolean
+  ): Promise<ConfirmAgentActionResponse> => {
+    return await apiClient.confirmAgentAction(actionId, confirmed)
+  }
+
+  /**
+   * 更新用户 AI 设置
+   */
+  const updateUserSettings = async (settings: Partial<UserSettings>): Promise<void> => {
+    error.value = null
+    try {
+      const updated = await apiClient.updateUserSettings(settings)
+      userSettings.value = updated
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '更新设置失败'
+      throw err
+    }
+  }
+
+  /**
    * 初始化：加载分类列表
    */
   const initializeCategories = async (): Promise<void> => {
@@ -714,6 +782,7 @@ export const useMailStore = defineStore('mail', () => {
   return {
     // 状态
     user,
+    userSettings,
     currentLabel,
     labels,
     mailboxItems,
@@ -730,6 +799,7 @@ export const useMailStore = defineStore('mail', () => {
     // 计算属性
     currentMailItems,
     mailItems,
+    aiEnabled,
 
     // 核心方法（新 API）
     login,
@@ -756,6 +826,13 @@ export const useMailStore = defineStore('mail', () => {
     addLabel,
     deleteLabel,
     initializeCategories,
+
+    // Agent 方法
+    createAgentSession,
+    getAgentSession,
+    sendAgentMessage,
+    confirmAgentAction,
+    updateUserSettings,
 
     // 向后兼容的方法
     getMailById,

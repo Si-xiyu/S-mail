@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ElMessage, ElNotification } from 'element-plus'
-import { ref, onBeforeUnmount, onMounted, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as apiClient from '../api/client'
 import TopBar from '../components/TopBar.vue'
 import Sidebar from '../components/Sidebar.vue'
 import MailList from '../components/MailList.vue'
 import MailDetailDrawer from '../components/MailDetailDrawer.vue'
-import WelcomePanel from '../components/WelcomePanel.vue'
+import AgentChatPanel from '../components/AgentChatPanel.vue'
 import ComposeDialog from '../components/ComposeDialog.vue'
 import SettingsDialog from '../components/SettingsDialog.vue'
 import { useMailStore } from '../stores/mailStore'
@@ -15,6 +15,12 @@ import { useMailStore } from '../stores/mailStore'
 const mailStore = useMailStore()
 const router = useRouter()
 const selectedMailId = ref<string | null>(null)
+const selectedItemId = computed(() => {
+  if (!selectedMailId.value) return null
+  const mailId = Number(selectedMailId.value)
+  const item = mailStore.mailboxItems.find(m => m.mailId === mailId)
+  return item?.itemId ?? null
+})
 const showCompose = ref(false)
 const showSettings = ref(false)
 const syncing = ref(false)
@@ -102,6 +108,10 @@ const handleLabelSelect = () => {
   selectedMailId.value = null
 }
 
+const handleAgentClick = () => {
+  selectedMailId.value = null
+}
+
 </script>
 
 <template>
@@ -114,6 +124,7 @@ const handleLabelSelect = () => {
         @draft-click="handleComposeBtnClick"
         @settings-click="showSettings = true"
         @label-select="handleLabelSelect"
+        @agent-click="handleAgentClick"
       />
 
       <!-- 中间面板：目录 ⇄ 邮件内容 -->
@@ -131,9 +142,14 @@ const handleLabelSelect = () => {
         />
       </div>
 
-      <!-- 右侧面板：欢迎页（以后接 AI 对话） -->
+      <!-- 右侧面板：全局 Agent / 当前邮件 Agent -->
       <aside class="right-panel">
-        <WelcomePanel @compose-click="handleComposeBtnClick" />
+        <AgentChatPanel
+          :scope="selectedMailId ? 'CURRENT_MAIL' : 'GLOBAL'"
+          :item-id="selectedItemId"
+          :title="selectedMailId ? '当前邮件助手' : 'SmartMail 助手'"
+          @action-confirmed="mailStore.refreshCurrent()"
+        />
       </aside>
     </div>
 

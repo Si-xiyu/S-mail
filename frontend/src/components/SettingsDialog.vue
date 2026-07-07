@@ -23,6 +23,15 @@ const formattedLastSync = computed(() => props.lastSyncedAt
 const updateInterval = (event: Event) => {
   emit('update:pollInterval', Number((event.target as HTMLSelectElement).value))
 }
+
+const toggleAi = async () => {
+  const next = !mailStore.aiEnabled
+  try {
+    await mailStore.updateUserSettings({ aiEnabled: next })
+  } catch (err) {
+    console.error('Failed to update AI setting:', err)
+  }
+}
 </script>
 
 <template>
@@ -42,6 +51,24 @@ const updateInterval = (event: Event) => {
         <span>邮箱</span>
         <strong>{{ mailStore.user?.email || '-' }}</strong>
       </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>AI 功能</h3>
+      <label class="setting-row toggle-row">
+        <span>启用 AI 助手</span>
+        <button
+          type="button"
+          class="toggle"
+          :class="{ on: mailStore.aiEnabled }"
+          @click="toggleAi"
+        >
+          <span class="thumb"></span>
+        </button>
+      </label>
+      <p class="settings-hint">
+        关闭后 Agent 助手将不可用，基础邮箱功能不受影响。
+      </p>
     </section>
 
     <section class="settings-section">
@@ -77,6 +104,32 @@ const updateInterval = (event: Event) => {
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 12px 0; color: rgba(55, 53, 47, 0.55); font-size: 13px; }
 .setting-row strong { color: #37352f; font-weight: 500; overflow-wrap: anywhere; font-size: 13px; }
 .setting-row select { padding: 6px 28px 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; font-size: 13px; color: #37352f; cursor: pointer; }
+.settings-hint { margin: 8px 0 0; font-size: 12px; color: rgba(55, 53, 47, 0.45); line-height: 1.5; }
+.toggle-row { cursor: pointer; }
+.toggle {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  border: none;
+  background: #d1d5db;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+  padding: 0;
+}
+.toggle.on { background: #37352f; }
+.toggle .thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+  display: block;
+}
+.toggle.on .thumb { transform: translateX(18px); }
 .sync-button, .close-button { border: 0; border-radius: 4px; padding: 8px 16px; color: #fff; background: #37352f; cursor: pointer; font-size: 13px; transition: background 0.15s; }
 .sync-button:hover:not(:disabled), .close-button:hover { background: #2b2925; }
 .sync-button:disabled { opacity: .45; cursor: default; }
