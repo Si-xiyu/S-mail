@@ -1,17 +1,48 @@
-# SmartMail 前后端运行完整指南
+# SmartMail 本地 Demo 运行指南
 
 ## 📋 目录
 
 1. [环境检查](#环境检查)
-2. [第一步：启动后端](#第一步启动后端)
-3. [第二步：启动前端](#第二步启动前端)
-4. [第三步：验证连接](#第三步验证连接)
-5. [第四步：功能测试](#第四步功能测试)
-6. [问题排查](#问题排查)
-7. [快速启动脚本](#快速启动脚本)
+2. [Agent 三服务联调速览](#agent-三服务联调速览)
+3. [第一步：启动后端](#第一步启动后端)
+4. [第二步：启动 Agent](#第二步启动-agent)
+5. [第三步：启动前端](#第三步启动前端)
+6. [第四步：验证连接](#第四步验证连接)
+7. [第五步：功能测试](#第五步功能测试)
+8. [问题排查](#问题排查)
+9. [快速启动脚本](#快速启动脚本)
 
 ---
 
+
+## Agent 三服务联调速览
+
+最终三方对接契约见 [docs/api/agent-integration.md](./docs/api/agent-integration.md)。本地 Demo 建议同时启动三个服务：
+
+```text
+Frontend http://127.0.0.1:5173
+  -> Backend http://localhost:8080
+      -> Agent http://127.0.0.1:8000
+          -> Backend Internal Tool API
+```
+
+字段和账号约定：
+
+- 邮箱统一使用 `@smail.com`，例如 `demo@smail.com`、`alice@smail.com`。
+- 前端只调用 `/api/v1/**`，不要直连 Agent。
+- Agent 消息请求字段是 `message`。
+- 当前邮件 Agent 会话上下文是 `context.mailItemId`。
+
+推荐测试提示词：
+
+- `这封邮件需要我做什么？`
+- `帮我总结这封邮件的三条要点。`
+- `这封邮件有没有风险？需要注意哪些链接或附件？`
+- `帮我搜索项目阶段汇报相关邮件。`
+- `把这封邮件标记为重要。`
+- `帮我把广告邮件移入回收站。`
+
+---
 ## 环境检查
 
 ### 检查 Java 环境（后端）
@@ -92,6 +123,16 @@ mvn clean package -DskipTests
 **预计时间**：2-5 分钟（首次构建可能较慢）
 
 #### 3️⃣ 启动后端服务
+
+联调 Agent 时先启用 AI Plugin 并配置 Agent 地址：
+
+```powershell
+$env:SMARTMAIL_AI_ENABLED = "true"
+$env:SMARTMAIL_AGENT_BASE_URL = "http://127.0.0.1:8000"
+$env:SMARTMAIL_AGENT_PLUGIN_TOKEN = "smartmail-agent-plugin-dev-token"
+```
+
+然后启动后端：
 
 ```bash
 mvn spring-boot:run
@@ -189,7 +230,33 @@ java -jar target/smartmail-backend-0.0.1-SNAPSHOT.jar
 
 ---
 
-## 第二步：启动前端
+
+## 第二步：启动 Agent
+
+保持后端运行，在新的终端窗口中启动 Python Agent。
+
+```powershell
+cd agent
+pip install -r requirements.txt
+$env:SMARTMAIL_BACKEND_BASE_URL = "http://localhost:8080"
+$env:SMARTMAIL_INTERNAL_TOKEN = "smartmail-internal-dev-token"
+$env:SMARTMAIL_PLUGIN_TOKEN = "smartmail-agent-plugin-dev-token"
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+默认地址：`http://127.0.0.1:8000`。
+
+不配置大模型 Key 时，Agent 使用规则或 mock fallback，仍可完成本地联调。需要 DeepSeek 时：
+
+```powershell
+cd agent
+Copy-Item config/providers.example.toml config/providers.toml
+$env:SMARTMAIL_AGENT_CONFIG = "./config/providers.toml"
+$env:DEEPSEEK_API_KEY = "sk-..."
+```
+
+---
+## 第三步：启动前端
 
 ### ⚠️ 重要：保持后端运行
 
@@ -282,7 +349,7 @@ npm run preview
 
 ---
 
-## 第三步：验证连接
+## 第四步：验证连接
 
 ### 1️⃣ 打开浏览器
 
@@ -339,7 +406,7 @@ CORS 错误
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"demo@smartmail.local","password":"123456"}'
+  -d '{"email":"demo@smail.com","password":"123456"}'
 ```
 
 **预期输出**（成功登录）：
@@ -350,7 +417,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   "data": {
     "token": "eyJhbGc...",
     "userId": 1,
-    "email": "demo@smartmail.local",
+    "email": "demo@smail.com",
     "username": "Demo User"
   }
 }
@@ -383,7 +450,7 @@ fetch('/api/v1/auth/login', {
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    email: 'demo@smartmail.local',
+    email: 'demo@smail.com',
     password: '123456'
   })
 })
@@ -399,7 +466,7 @@ API Response: {code: 0, message: "success", data: {...}}
 
 ---
 
-## 第四步：功能测试
+## 第五步：功能测试
 
 ### 🧪 基础流程测试
 
@@ -412,7 +479,7 @@ API Response: {code: 0, message: "success", data: {...}}
 
 #### 2️⃣ 用户登录
 
-- 输入邮箱（例如：`demo@smartmail.local`）
+- 输入邮箱（例如：`demo@smail.com`）
 - 输入密码（例如：`123456`）
 - 点击"登录"
 
@@ -679,7 +746,7 @@ localStorage.getItem('test')  // 应该返回 'hello'
 # 重新登录
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"demo@smartmail.local","password":"123456"}'
+  -d '{"email":"demo@smail.com","password":"123456"}'
 ```
 
 获取新 Token，然后在前端重新登录。
@@ -696,7 +763,7 @@ localStorage.getItem('smartmail_token')  // 应该是完整的 JWT
 
 确保用户已在后端注册或存在。检查后端日志：
 ```
-[ERROR] User not found: demo@smartmail.local
+[ERROR] User not found: demo@smail.com
 ```
 
 ---
@@ -724,7 +791,7 @@ localStorage.getItem('smartmail_token')  // 应该是完整的 JWT
 **示例：错误的请求体**
 ```json
 {
-  "email": "demo@smartmail.local"
+  "email": "demo@smail.com"
   // ❌ 缺少 password 字段
 }
 ```
@@ -732,7 +799,7 @@ localStorage.getItem('smartmail_token')  // 应该是完整的 JWT
 **正确的请求体**
 ```json
 {
-  "email": "demo@smartmail.local",
+  "email": "demo@smail.com",
   "password": "123456"  // ✅ 必需字段
 }
 ```
@@ -953,12 +1020,25 @@ pause > nul
 
 #### 终端 1 - 后端
 
-```bash
+```powershell
 cd backend
+$env:SMARTMAIL_AI_ENABLED = "true"
+$env:SMARTMAIL_AGENT_BASE_URL = "http://127.0.0.1:8000"
+$env:SMARTMAIL_AGENT_PLUGIN_TOKEN = "smartmail-agent-plugin-dev-token"
 mvn spring-boot:run
 ```
 
-#### 终端 2 - 前端
+#### 终端 2 - Agent
+
+```powershell
+cd agent
+$env:SMARTMAIL_BACKEND_BASE_URL = "http://localhost:8080"
+$env:SMARTMAIL_INTERNAL_TOKEN = "smartmail-internal-dev-token"
+$env:SMARTMAIL_PLUGIN_TOKEN = "smartmail-agent-plugin-dev-token"
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+#### 终端 3 - 前端
 
 ```bash
 cd frontend
@@ -966,13 +1046,13 @@ npm install
 npm run dev
 ```
 
-#### 终端 3 - 测试（可选）
+#### 终端 4 - 测试（可选）
 
 ```bash
 # 测试登录
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"demo@smartmail.local","password":"123456"}'
+  -d '{"email":"demo@smail.com","password":"123456"}'
 ```
 
 ---
@@ -1140,4 +1220,3 @@ curl -v http://127.0.0.1:5173
 5. 重启服务
 
 祝你运行顺利！🚀
-

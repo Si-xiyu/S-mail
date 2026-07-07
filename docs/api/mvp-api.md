@@ -39,7 +39,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "email": "demo@smartmail.local",
+  "email": "demo@smail.com",
   "username": "Demo",
   "password": "123456"
 }
@@ -49,7 +49,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "email": "demo@smartmail.local",
+  "email": "demo@smail.com",
   "password": "123456"
 }
 ```
@@ -60,7 +60,7 @@ Authorization: Bearer <token>
 {
   "token": "jwt-token",
   "userId": 1,
-  "email": "demo@smartmail.local",
+  "email": "demo@smail.com",
   "username": "Demo"
 }
 ```
@@ -119,7 +119,7 @@ Authorization: Bearer <token>
   "itemId": 101,
   "mailId": 88,
   "folder": "INBOX",
-  "senderEmail": "teacher@smartmail.local",
+  "senderEmail": "teacher@smail.com",
   "subject": "项目阶段汇报提醒",
   "summaryPreview": "请在明天下午前提交项目进度并准备演示。",
   "category": { "id": 1, "name": "课程", "color": "#4f46e5" },
@@ -143,8 +143,8 @@ Authorization: Bearer <token>
   "itemId": 101,
   "mailId": 88,
   "folder": "INBOX",
-  "senderEmail": "teacher@smartmail.local",
-  "recipients": ["demo@smartmail.local"],
+  "senderEmail": "teacher@smail.com",
+  "recipients": ["demo@smail.com"],
   "subject": "项目阶段汇报提醒",
   "contentText": "请各组在明天下午前提交项目进度...",
   "contentHtml": null,
@@ -206,7 +206,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "to": ["alice@smartmail.local"],
+  "to": ["alice@smail.com"],
   "cc": [],
   "bcc": [],
   "subject": "SmartMail MVP 联调",
@@ -223,7 +223,7 @@ Authorization: Bearer <token>
   "mailId": 88,
   "messageNo": "SM-20260610-0001",
   "delivery": {
-    "delivered": ["alice@smartmail.local"],
+    "delivered": ["alice@smail.com"],
     "failed": []
   }
 }
@@ -344,7 +344,7 @@ Authorization: Bearer <token>
 ```json
 {
   "scope": "CURRENT_MAIL",
-  "itemId": 101
+  "context": { "mailItemId": 101 }
 }
 ```
 
@@ -352,7 +352,8 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "scope": "GLOBAL"
+  "scope": "GLOBAL",
+  "context": {}
 }
 ```
 
@@ -369,7 +370,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "content": "帮我总结这封邮件需要我做什么"
+  "message": "帮我总结这封邮件需要我做什么"
 }
 ```
 
@@ -474,14 +475,14 @@ RAG Tool 或 mock RAG Tool 使用。MVP 可返回演示数据。
 | 参数 | 说明 |
 | --- | --- |
 | `userId` | 用户 ID |
-| `query` | 检索问题 |
+| `keyword` | 检索词 |
 | `limit` | 数量 |
 
 ### POST `/internal/v1/tools/analysis-results`
 
 自动分析管道写回摘要、分类、Junk、优先级、风险提示和状态。
 
-### POST `/internal/v1/tools/mail-actions`
+### POST `/internal/v1/tools/mail-actions/execute`
 
 交互式 Agent 的写操作执行入口。只有用户确认后，后端才应调用实际写操作。
 

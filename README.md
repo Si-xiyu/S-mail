@@ -8,6 +8,8 @@ SmartMail 是一个 Web 邮件系统实训项目。关闭 AI Plugin 时，它是
 - [SmartMail项目全貌.md](./SmartMail项目全貌.md)：面向人类快速理解的项目总览。
 - [CONTEXT.md](./CONTEXT.md)：项目领域术语和已确认边界。
 - [docs/README.md](./docs/README.md)：正式文档目录说明。
+- [docs/api/agent-integration.md](./docs/api/agent-integration.md)：前端、后端、Agent 三方联调主文档。
+- [RUNNING_GUIDE.md](./RUNNING_GUIDE.md)：本地启动和 Demo 验证步骤。
 
 ## 当前定位
 
@@ -39,7 +41,7 @@ SmartMail 是一个 Web 邮件系统实训项目。关闭 AI Plugin 时，它是
 | 后端 | Spring Boot 3、Java 17、Spring Security、MyBatis-Plus、MySQL/H2、JWT |
 | Agent | Python、FastAPI、Pydantic、httpx、DeepSeek/Ollama 后续接入 |
 | 存储 | 主数据库、本地磁盘附件存储 |
-| 通信 | HTTP REST、Workspace View API、Internal Tool API |
+| 通信 | HTTP REST、Workspace View API、Agent Plugin API、Internal Tool API |
 
 ## 仓库结构
 
