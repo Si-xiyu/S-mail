@@ -10,6 +10,7 @@ const emit = defineEmits<{
   composeClick: []
   draftClick: []
   settingsClick: []
+  agentClick: []
   labelSelect: [labelId: string]
 }>()
 
@@ -143,6 +144,15 @@ const handleDeleteLabel = async (labelId: string) => {
           >
             ✕
           </button>
+        </button>
+      </div>
+
+      <!-- 全局 Agent 入口 -->
+      <div class="labels-group">
+        <div class="group-title">AI</div>
+        <button class="label-item agent-entry" @click="emit('agentClick')">
+          <span class="label-icon">✦</span>
+          <span class="label-name">SmartMail 助手</span>
         </button>
       </div>
     </nav>
@@ -284,6 +294,15 @@ const handleDeleteLabel = async (labelId: string) => {
 
 .label-item.custom-label.hovered {
   padding-right: 4px;
+}
+
+.label-item.agent-entry {
+  color: #37352f;
+  font-weight: 500;
+}
+
+.label-item.agent-entry:hover {
+  background: #f4f4f4;
 }
 
 .label-icon {

@@ -1,6 +1,12 @@
 import axios, { AxiosError } from 'axios'
 import type {
+  AgentMessageRequest,
+  AgentMessageResponse,
+  AgentSessionResponse,
   AgentTaskResponse,
+  ConfirmAgentActionRequest,
+  ConfirmAgentActionResponse,
+  CreateAgentSessionRequest,
   MailDetail,
   MailboxItem,
   MailSendResponse,
@@ -8,7 +14,8 @@ import type {
   PendingAttachment,
   SendMailPayload,
   ThreadMessage,
-  UserProfile
+  UserProfile,
+  UserSettings
 } from '../types/mail'
 
 export class ApiError extends Error {
@@ -384,4 +391,82 @@ export async function changeCategory(itemId: number, categoryId: number): Promis
   if (data.code !== 0) {
     throw new Error(data.message)
   }
+}
+
+// ============ Agent API ============
+/**
+ * 创建 Agent 会话
+ * @param scope 会话范围：GLOBAL 或 CURRENT_MAIL
+ * @param context 上下文，CURRENT_MAIL 需包含 mailItemId
+ */
+export async function createAgentSession(
+  scope: 'GLOBAL' | 'CURRENT_MAIL',
+  context?: Record<string, unknown>
+): Promise<AgentSessionResponse> {
+  const { data } = await http.post<ApiResponse<AgentSessionResponse>>('/agent/sessions', {
+    scope,
+    context
+  } as CreateAgentSessionRequest)
+  if (data.code !== 0) {
+    throw new Error(data.message || '创建 Agent 会话失败')
+  }
+  return data.data
+}
+
+/**
+ * 获取 Agent 会话详情（含历史消息和待确认动作）
+ */
+export async function getAgentSession(sessionId: string): Promise<AgentSessionResponse> {
+  const { data } = await http.get<ApiResponse<AgentSessionResponse>>(`/agent/sessions/${sessionId}`)
+  if (data.code !== 0) {
+    throw new Error(data.message || '获取 Agent 会话失败')
+  }
+  return data.data
+}
+
+/**
+ * 向 Agent 会话发送消息
+ */
+export async function sendAgentMessage(
+  sessionId: string,
+  message: string
+): Promise<AgentMessageResponse> {
+  const { data } = await http.post<ApiResponse<AgentMessageResponse>>(
+    `/agent/sessions/${sessionId}/messages`,
+    { message } as AgentMessageRequest
+  )
+  if (data.code !== 0) {
+    throw new Error(data.message || '发送消息失败')
+  }
+  return data.data
+}
+
+/**
+ * 确认或取消 Agent 待确认动作
+ * @param actionId 动作 ID
+ * @param confirmed true 确认执行，false 取消
+ */
+export async function confirmAgentAction(
+  actionId: string,
+  confirmed: boolean
+): Promise<ConfirmAgentActionResponse> {
+  const { data } = await http.post<ApiResponse<ConfirmAgentActionResponse>>(
+    `/agent/actions/${actionId}/confirm`,
+    { confirmed } as ConfirmAgentActionRequest
+  )
+  if (data.code !== 0) {
+    throw new Error(data.message || '确认动作失败')
+  }
+  return data.data
+}
+
+/**
+ * 更新当前用户设置
+ */
+export async function updateUserSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
+  const { data } = await http.patch<ApiResponse<UserSettings>>('/users/me/settings', settings)
+  if (data.code !== 0) {
+    throw new Error(data.message || '更新设置失败')
+  }
+  return data.data
 }
