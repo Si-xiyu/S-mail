@@ -240,9 +240,11 @@ public class AgentSessionService {
     ) {
         List<PendingAgentActionResponse> responses = new ArrayList<>();
         for (Map<String, Object> item : pendingActions) {
+            String actionType = stringValue(item.get("type"), "UNKNOWN");
             String actionId = stringValue(item.get("actionId"), null);
             if (actionId == null || actionId.isBlank()) {
-                continue;
+                actionId = generatedActionId(sessionId, actionType, mapValue(item.get("payload")));
+                item.put("actionId", actionId);
             }
             AgentPendingAction action = actionMapper.findByActionIdAndUserId(actionId, userId);
             boolean existing = action != null;
@@ -253,7 +255,7 @@ public class AgentSessionService {
                 action.setUserId(userId);
                 action.setCreatedAt(LocalDateTime.now());
             }
-            action.setType(stringValue(item.get("type"), "UNKNOWN"));
+            action.setType(actionType);
             action.setLabel(stringValue(item.get("label"), action.getType()));
             action.setPayloadJson(toJson(mapValue(item.get("payload"))));
             action.setReason(stringValue(item.get("reason"), ""));
@@ -268,6 +270,18 @@ public class AgentSessionService {
             responses.add(toPendingActionResponse(action));
         }
         return responses;
+    }
+
+    private String generatedActionId(String sessionId, String actionType, Map<String, Object> payload) {
+        Object itemId = payload.get("mailItemId");
+        if (itemId == null) {
+            itemId = payload.get("itemId");
+        }
+        if (itemId == null) {
+            itemId = payload.get("mailId");
+        }
+        String itemPart = itemId == null ? UUID.randomUUID().toString() : String.valueOf(itemId);
+        return sessionId + ":" + actionType + ":" + itemPart;
     }
 
     private AgentSessionResponse toSessionResponse(AgentSession session) {
