@@ -18,6 +18,7 @@ Frontend
 - Agent Plugin 不直接访问数据库或附件文件。
 - 后端是唯一的业务权限中心。
 - AI Plugin 关闭时，后端不调用 Agent Plugin，基础邮件系统保持可用。
+- 前端侧交互式 Agent 只调用后端公开 API：`POST /api/v1/agent/sessions`、`POST /api/v1/agent/sessions/{sessionId}/messages`、`POST /api/v1/agent/actions/{actionId}/confirm`。
 - Agent Plugin 失败时，邮件收发、同步、附件、搜索不受影响。
 
 ## 2. 服务角色
@@ -297,7 +298,7 @@ Agent Plugin 内部调用后端：
 | 参数 | 说明 |
 | --- | --- |
 | `userId` | 用户 ID |
-| `query` | 用户问题或检索词 |
+| `keyword` | 用户问题抽取后的检索词 |
 | `limit` | 返回数量 |
 
 MVP mock 响应：
@@ -339,9 +340,9 @@ Agent Plugin 只能通过这些工具访问后端能力。
 
 自动分析管道写回结构化结果。
 
-### POST `/internal/v1/tools/mail-actions`
+### POST `/internal/v1/tools/mail-actions/execute`
 
-执行用户已确认的写操作。Agent Plugin 不应绕过后端业务服务直接改数据。
+执行用户已确认的写操作。Agent Plugin 不应绕过后端业务服务直接改数据。当前白名单包括 `MARK_READ`、`MOVE_TO_JUNK`、`MOVE`、`SET_PRIORITY`、`SET_CATEGORY`；其中 `MOVE` 的 `folder` 只能是 `INBOX`、`JUNK`、`TRASH`。
 
 ## 9. Plugin Disabled 行为
 
