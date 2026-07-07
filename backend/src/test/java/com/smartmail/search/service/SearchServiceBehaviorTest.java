@@ -25,7 +25,7 @@ class SearchServiceBehaviorTest {
     void setUp() {
         mailboxItemMapper = mock(MailboxItemMapper.class);
         searchService = new SearchService(mailboxItemMapper);
-        UserContext.set(new CurrentUser(1L, "user@smartmail.local", "User"));
+        UserContext.set(new CurrentUser(1L, "user@smail.com", "User"));
     }
 
     @AfterEach

@@ -34,7 +34,7 @@ class MailboxServiceStateTransitionTest {
         mailboxMapper = mock(MailboxItemMapper.class);
         categoryService = mock(CategoryService.class);
         service = new MailboxService(mailboxMapper, mock(MailMessageMapper.class), categoryService);
-        UserContext.set(new CurrentUser(1L, "user@smartmail.local", "User"));
+        UserContext.set(new CurrentUser(1L, "user@smail.com", "User"));
     }
 
     @AfterEach

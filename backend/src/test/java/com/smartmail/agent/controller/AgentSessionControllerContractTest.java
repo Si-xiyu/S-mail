@@ -24,7 +24,26 @@ class AgentSessionControllerContractTest {
     private ObjectMapper objectMapper;
 
     @Test
-    void sessionMessageApiReturnsDisabledWhenAiPluginIsOff() throws Exception {
+    void currentMailSessionAcceptsItemIdAlias() throws Exception {
+        String token = registerAndGetToken();
+
+        mockMvc.perform(post("/api/v1/agent/sessions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "scope": "CURRENT_MAIL",
+                                  "itemId": 88
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.scope").value("CURRENT_MAIL"))
+                .andExpect(jsonPath("$.data.context.mailItemId").value(88));
+    }
+
+    @Test
+    void sessionMessageApiAcceptsContentAliasAndReturnsDisabledWhenAiPluginIsOff() throws Exception {
         String token = registerAndGetToken();
 
         String sessionJson = mockMvc.perform(post("/api/v1/agent/sessions")
@@ -51,7 +70,7 @@ class AgentSessionControllerContractTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"message":"帮我搜索 Google 的邮件"}
+                                {"content":"帮我搜索 Google 的邮件"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
@@ -61,7 +80,7 @@ class AgentSessionControllerContractTest {
     }
 
     private String registerAndGetToken() throws Exception {
-        String email = "agent-" + System.nanoTime() + "@smartmail.local";
+        String email = "agent-" + System.nanoTime() + "@smail.com";
         String response = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

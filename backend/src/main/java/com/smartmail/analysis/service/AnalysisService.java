@@ -21,6 +21,7 @@ import com.smartmail.mail.mapper.MailRecipientMapper;
 import com.smartmail.mailbox.entity.MailboxItem;
 import com.smartmail.mailbox.mapper.MailboxItemMapper;
 import com.smartmail.user.service.UserSettingService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,7 @@ public class AnalysisService {
     private final MailAiResultMapper aiResultMapper;
 
     private final UserSettingService userSettingService;
+    private final boolean agentEnabled;
 
     public AnalysisService(
             AiAnalysisTaskMapper taskMapper,
@@ -61,7 +63,8 @@ public class AnalysisService {
             MailCategoryMapper categoryMapper,
             CategoryService categoryService,
             MailAiResultMapper aiResultMapper,
-            UserSettingService userSettingService
+            UserSettingService userSettingService,
+            @Value("${smartmail.ai.enabled}") boolean agentEnabled
     ) {
         this.taskMapper = taskMapper;
         this.aiService = aiService;
@@ -73,10 +76,11 @@ public class AnalysisService {
         this.categoryService = categoryService;
         this.aiResultMapper = aiResultMapper;
         this.userSettingService = userSettingService;
+        this.agentEnabled = agentEnabled;
     }
 
     public void createTask(Long itemId, Long mailId, Long userId) {
-        boolean aiEnabled = userSettingService.ensure(userId).getAiEnabled();
+        boolean aiEnabled = isAiEnabledFor(userId);
         AiAnalysisTask task = new AiAnalysisTask();
         task.setItemId(itemId);
         task.setMailId(mailId);
@@ -140,6 +144,10 @@ public class AnalysisService {
         if (existing != null && "PENDING".equals(existing.getStatus())) {
             return new AnalysisRetryResponse("PENDING");
         }
+        if (!isAiEnabledFor(userId)) {
+            createTask(item.getId(), item.getMailId(), userId);
+            return new AnalysisRetryResponse("DISABLED");
+        }
         createTask(item.getId(), item.getMailId(), userId);
         return new AnalysisRetryResponse("PENDING");
     }
@@ -180,7 +188,7 @@ public class AnalysisService {
         mailPayload.put("sentAt", mail.getSentAt());
 
         var setting = userSettingService.ensure(task.getUserId());
-        boolean aiEnabled = Boolean.TRUE.equals(setting.getAiEnabled());
+        boolean aiEnabled = agentEnabled && Boolean.TRUE.equals(setting.getAiEnabled());
         String provider = "RULES";
 
         Map<String, Object> request = new LinkedHashMap<>();
@@ -277,6 +285,10 @@ public class AnalysisService {
 
     private String stringValue(Object value, String fallback) {
         return value == null ? fallback : String.valueOf(value);
+    }
+
+    private boolean isAiEnabledFor(Long userId) {
+        return agentEnabled && Boolean.TRUE.equals(userSettingService.ensure(userId).getAiEnabled());
     }
 
     private Long longValue(Object value) {

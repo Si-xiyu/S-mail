@@ -45,7 +45,7 @@ class AttachmentServiceTest {
 
     @Test
     void uploadAndBindCurrentUsersPendingAttachment() {
-        UserContext.set(new CurrentUser(101L, "sender@smartmail.local", "Sender"));
+        UserContext.set(new CurrentUser(101L, "sender@smail.com", "Sender"));
         MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", "hello".getBytes());
 
         PendingAttachmentResponse uploaded = attachmentService.upload(file);
@@ -58,7 +58,7 @@ class AttachmentServiceTest {
 
     @Test
     void uploadRejectsEmptyFile() {
-        UserContext.set(new CurrentUser(101L, "sender@smartmail.local", "Sender"));
+        UserContext.set(new CurrentUser(101L, "sender@smail.com", "Sender"));
         MockMultipartFile file = new MockMultipartFile("file", "empty.txt", "text/plain", new byte[0]);
 
         assertThatThrownBy(() -> attachmentService.upload(file))
@@ -67,7 +67,7 @@ class AttachmentServiceTest {
 
     @Test
     void bindRejectsAnotherUsersPendingAttachment() {
-        UserContext.set(new CurrentUser(101L, "sender@smartmail.local", "Sender"));
+        UserContext.set(new CurrentUser(101L, "sender@smail.com", "Sender"));
         MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", "hello".getBytes());
         PendingAttachmentResponse uploaded = attachmentService.upload(file);
 
@@ -78,7 +78,7 @@ class AttachmentServiceTest {
 
     @Test
     void bindRejectsSamePendingAttachmentTwice() {
-        UserContext.set(new CurrentUser(101L, "sender@smartmail.local", "Sender"));
+        UserContext.set(new CurrentUser(101L, "sender@smail.com", "Sender"));
         MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", "hello".getBytes());
         PendingAttachmentResponse uploaded = attachmentService.upload(file);
 

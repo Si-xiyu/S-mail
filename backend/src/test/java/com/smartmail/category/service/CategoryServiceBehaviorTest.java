@@ -31,7 +31,7 @@ class CategoryServiceBehaviorTest {
         categoryMapper = mock(MailCategoryMapper.class);
         assignmentMapper = mock(MailCategoryAssignmentMapper.class);
         service = new CategoryService(categoryMapper, assignmentMapper);
-        UserContext.set(new CurrentUser(1L, "user@smartmail.local", "User"));
+        UserContext.set(new CurrentUser(1L, "user@smail.com", "User"));
     }
 
     @AfterEach

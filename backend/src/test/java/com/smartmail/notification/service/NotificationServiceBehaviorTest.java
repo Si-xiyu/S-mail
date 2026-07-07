@@ -30,7 +30,7 @@ class NotificationServiceBehaviorTest {
         mailboxMapper = mock(MailboxItemMapper.class);
         categoryMapper = mock(MailCategoryMapper.class);
         service = new NotificationService(mailboxMapper, categoryMapper);
-        UserContext.set(new CurrentUser(1L, "user@smartmail.local", "User"));
+        UserContext.set(new CurrentUser(1L, "user@smail.com", "User"));
     }
 
     @AfterEach
