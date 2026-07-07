@@ -14,10 +14,15 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+.venv.bak/
+
+# Agent worktree
+agent/.worktree-main/
 
 # Environment and secrets
 .env
 *.local
+agent/config/providers.toml
 
 # IDE / OS
 .idea/

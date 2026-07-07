@@ -20,6 +20,7 @@ import com.smartmail.mail.mapper.MailMessageMapper;
 import com.smartmail.mail.mapper.MailRecipientMapper;
 import com.smartmail.mailbox.entity.MailboxItem;
 import com.smartmail.mailbox.mapper.MailboxItemMapper;
+import com.smartmail.user.service.UserSettingService;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,8 @@ public class AnalysisService {
     private final CategoryService categoryService;
     private final MailAiResultMapper aiResultMapper;
 
+    private final UserSettingService userSettingService;
+
     public AnalysisService(
             AiAnalysisTaskMapper taskMapper,
             AiService aiService,
@@ -57,7 +60,8 @@ public class AnalysisService {
             MailAttachmentMapper attachmentMapper,
             MailCategoryMapper categoryMapper,
             CategoryService categoryService,
-            MailAiResultMapper aiResultMapper
+            MailAiResultMapper aiResultMapper,
+            UserSettingService userSettingService
     ) {
         this.taskMapper = taskMapper;
         this.aiService = aiService;
@@ -68,15 +72,17 @@ public class AnalysisService {
         this.categoryMapper = categoryMapper;
         this.categoryService = categoryService;
         this.aiResultMapper = aiResultMapper;
+        this.userSettingService = userSettingService;
     }
 
     public void createTask(Long itemId, Long mailId, Long userId) {
+        boolean aiEnabled = userSettingService.ensure(userId).getAiEnabled();
         AiAnalysisTask task = new AiAnalysisTask();
         task.setItemId(itemId);
         task.setMailId(mailId);
         task.setUserId(userId);
         task.setTaskType("FULL_ANALYSIS");
-        task.setStatus("PENDING");
+        task.setStatus(aiEnabled ? "PENDING" : "DISABLED");
         task.setRetryCount(0);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
@@ -101,6 +107,7 @@ public class AnalysisService {
             String status = stringValue(response.get("status"), "FAILED");
             if ("SUCCEEDED".equals(status) || "PARTIAL".equals(status)) {
                 saveAnalysisResult(task, response, status);
+                saveSummaryResult(task, response);
                 applyAnalysisOutcome(task, response);
                 task.setStatus("SUCCEEDED");
             } else if ("DISABLED".equals(status)) {
@@ -172,6 +179,10 @@ public class AnalysisService {
         mailPayload.put("attachments", attachments);
         mailPayload.put("sentAt", mail.getSentAt());
 
+        var setting = userSettingService.ensure(task.getUserId());
+        boolean aiEnabled = Boolean.TRUE.equals(setting.getAiEnabled());
+        String provider = "RULES";
+
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("taskId", task.getId());
         request.put("userId", task.getUserId());
@@ -184,8 +195,8 @@ public class AnalysisService {
                 "recentMarkedJunkSenders", List.of()
         ));
         request.put("pluginConfig", Map.of(
-                "aiPluginEnabled", true,
-                "provider", "RULES",
+                "aiPluginEnabled", aiEnabled,
+                "provider", provider,
                 "llmEnabled", false,
                 "ragEnabled", false
         ));
@@ -207,6 +218,27 @@ public class AnalysisService {
         result.setResultType("ANALYSIS");
         result.setResultJson(JsonUtil.toJson(response));
         result.setStatus(status);
+        result.setCreatedAt(LocalDateTime.now());
+        result.setUpdatedAt(LocalDateTime.now());
+        aiResultMapper.insert(result);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void saveSummaryResult(AiAnalysisTask task, Map<String, Object> response) {
+        Object summaryObj = response.get("summary");
+        if (!(summaryObj instanceof List<?> summaryList) || summaryList.isEmpty()) {
+            return;
+        }
+        List<String> summary = summaryList.stream()
+                .map(String::valueOf)
+                .limit(3)
+                .toList();
+        MailAiResult result = new MailAiResult();
+        result.setMailId(task.getMailId());
+        result.setUserId(task.getUserId());
+        result.setResultType("SUMMARY");
+        result.setResultJson(JsonUtil.toJson(Map.of("summary", summary)));
+        result.setStatus("SUCCEEDED");
         result.setCreatedAt(LocalDateTime.now());
         result.setUpdatedAt(LocalDateTime.now());
         aiResultMapper.insert(result);

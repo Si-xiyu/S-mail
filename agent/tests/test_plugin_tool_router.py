@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
+from app.schemas.agent import ToolResult
 from app.schemas.plugin import PluginChatRequest
 from app.services.tool_router import ToolRouter
 from app.tools.backend_tools import BackendToolClient, to_mail_context
@@ -24,7 +25,7 @@ class ToolRouterTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status, "DISABLED")
-        self.assertIn("disabled", response.answer.lower())
+        self.assertIn("关闭", response.answer)
         self.assertEqual(response.tool_calls, [])
         self.assertEqual(response.pending_actions, [])
 
@@ -39,7 +40,7 @@ class ToolRouterTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status, "SUCCEEDED")
-        self.assertIn("mock retrieval", response.answer)
+        self.assertIn("mock", response.answer.lower())
         self.assertEqual(response.tool_calls[0].tool, "rag_tool")
         self.assertEqual(response.tool_calls[0].source, "MOCK")
         self.assertEqual(response.tool_calls[0].output["records"][0]["source"], "MOCK")
@@ -59,7 +60,7 @@ class ToolRouterTest(unittest.TestCase):
         self.assertEqual(response.status, "SUCCEEDED")
         self.assertEqual(response.pending_actions[0].type, "MARK_READ")
         self.assertEqual(response.pending_actions[0].action_id, "s1:42:MARK_READ")
-        self.assertEqual(response.pending_actions[0].label, "Mark as read")
+        self.assertEqual(response.pending_actions[0].label, "标记为已读")
         self.assertEqual(response.pending_actions[0].status, "PENDING")
         self.assertEqual(response.pending_actions[0].payload["mailItemId"], 42)
 
@@ -114,6 +115,32 @@ class ToolRouterTest(unittest.TestCase):
         self.assertNotIn("category", response.pending_actions[0].payload)
 
 
+    def test_global_delete_ad_mail_creates_trash_pending_actions(self) -> None:
+        with patch.object(self.router.backend_tools, "search_mail", return_value=ToolResult(ok=True, data=[
+            {
+                "mailItemId": 88,
+                "subject": "Big discount ad",
+                "senderEmail": "ads@example.com",
+                "snippet": "limited promotion",
+            }
+        ])) as search_mail:
+            response = self.router.chat(
+                PluginChatRequest(
+                    sessionId="s1",
+                    userId=1,
+                    scope="GLOBAL",
+                    message="帮我把广告邮件删掉",
+                    toolPolicy={"agentAutoWriteEnabled": False},
+                )
+            )
+
+        self.assertEqual(response.status, "SUCCEEDED")
+        search_mail.assert_called_once()
+        self.assertEqual(response.pending_actions[0].type, "MOVE")
+        self.assertEqual(response.pending_actions[0].payload["mailItemId"], 88)
+        self.assertEqual(response.pending_actions[0].payload["folder"], "TRASH")
+        self.assertEqual(response.pending_actions[0].payload["action"], "MOVE")
+        self.assertIn("确认", response.answer)
 class BackendToolClientTest(unittest.TestCase):
     def setUp(self) -> None:
         self.client = BackendToolClient()
@@ -136,7 +163,8 @@ class BackendToolClientTest(unittest.TestCase):
 
         self.assertTrue(result.ok)
         self.assertEqual(result.data["source"], "BACKEND")
-        self.assertTrue(get.call_args.args[0].endswith("/internal/v1/tools/mail-items/88/context"))
+        self.assertTrue(get.call_args_list[0].args[0].endswith("/internal/v1/tools/mail-items/88/context"))
+        self.assertEqual(get.call_args_list[0].kwargs["params"], {"userId": 1})
         self.assertEqual(to_mail_context(result.data).mail_id, 88)
 
     def test_current_mail_context_falls_back_to_legacy_mail_path(self) -> None:
@@ -160,6 +188,38 @@ class BackendToolClientTest(unittest.TestCase):
         self.assertTrue(get.call_args_list[0].args[0].endswith("/internal/v1/tools/mail-items/42/context"))
         self.assertTrue(get.call_args_list[1].args[0].endswith("/internal/v1/tools/mails/42"))
         self.assertEqual(get.call_args_list[1].kwargs["params"], {"userId": 1})
+
+
+    def test_search_mail_calls_backend_search_endpoint(self) -> None:
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "code": 0,
+            "data": [
+                {
+                    "mailItemId": 88,
+                    "subject": "Project update",
+                    "snippet": "Please send the project update.",
+                    "source": "BACKEND",
+                    "score": 1.0,
+                }
+            ],
+        }
+
+        with patch("app.tools.backend_tools.httpx.get", return_value=response) as get:
+            result = self.client.search_mail(1, "project", folder="inbox", limit=5)
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data, response.json.return_value["data"])
+        self.assertTrue(get.call_args.args[0].endswith("/internal/v1/tools/mail-search"))
+        self.assertEqual(get.call_args.kwargs["params"], {"userId": 1, "keyword": "project", "limit": 5, "folder": "INBOX"})
+
+    def test_backend_timeout_is_classified(self) -> None:
+        with patch("app.tools.backend_tools.httpx.get", side_effect=Exception("timed out")):
+            result = self.client.get_mail(1, 1)
+
+        self.assertFalse(result.ok)
+        self.assertIn("BACKEND_ERROR", result.error)
 
 
 if __name__ == "__main__":

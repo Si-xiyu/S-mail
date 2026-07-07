@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 AgentTask = Literal["summary", "reply_draft", "analyze"]
 AnalysisStatus = Literal["DISABLED", "SUCCEEDED", "PARTIAL", "FAILED"]
 Priority = Literal["LOW", "NORMAL", "HIGH", "URGENT"]
-RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
+RiskLevel = Literal["NONE", "LOW", "MEDIUM", "HIGH"]
 
 
 class AgentTaskRequest(BaseModel):
@@ -42,7 +42,7 @@ class MailContext(BaseModel):
 
 class ToolResult(BaseModel):
     ok: bool
-    data: dict[str, Any] | None = None
+    data: dict[str, Any] | list[Any] | None = None
     error: str | None = None
 
 
@@ -86,6 +86,7 @@ class PluginConfig(BaseModel):
     ai_plugin_enabled: bool = Field(default=True, alias="aiPluginEnabled")
     llm_enabled: bool = Field(default=False, alias="llmEnabled")
     api_key: str | None = Field(default=None, alias="apiKey")
+    provider: str | None = Field(default=None, alias="provider")
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
