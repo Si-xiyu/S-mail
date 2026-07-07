@@ -52,6 +52,7 @@ public class AnalysisService {
 
     private final UserSettingService userSettingService;
     private final boolean agentEnabled;
+    private final String agentProvider;
 
     public AnalysisService(
             AiAnalysisTaskMapper taskMapper,
@@ -64,7 +65,8 @@ public class AnalysisService {
             CategoryService categoryService,
             MailAiResultMapper aiResultMapper,
             UserSettingService userSettingService,
-            @Value("${smartmail.ai.enabled}") boolean agentEnabled
+            @Value("${smartmail.ai.enabled}") boolean agentEnabled,
+            @Value("${smartmail.ai.provider:DEEPSEEK}") String agentProvider
     ) {
         this.taskMapper = taskMapper;
         this.aiService = aiService;
@@ -77,6 +79,7 @@ public class AnalysisService {
         this.aiResultMapper = aiResultMapper;
         this.userSettingService = userSettingService;
         this.agentEnabled = agentEnabled;
+        this.agentProvider = agentProvider;
     }
 
     public void createTask(Long itemId, Long mailId, Long userId) {
@@ -189,10 +192,9 @@ public class AnalysisService {
 
         var setting = userSettingService.ensure(task.getUserId());
         boolean aiEnabled = agentEnabled && Boolean.TRUE.equals(setting.getAiEnabled());
-        String provider = "RULES";
 
         Map<String, Object> request = new LinkedHashMap<>();
-        request.put("taskId", task.getId());
+        request.put("taskId", String.valueOf(task.getId()));
         request.put("userId", task.getUserId());
         request.put("mailItemId", task.getItemId());
         request.put("mail", mailPayload);
@@ -204,8 +206,8 @@ public class AnalysisService {
         ));
         request.put("pluginConfig", Map.of(
                 "aiPluginEnabled", aiEnabled,
-                "provider", provider,
-                "llmEnabled", false,
+                "provider", agentProvider,
+                "llmEnabled", aiEnabled,
                 "ragEnabled", false
         ));
         return request;
