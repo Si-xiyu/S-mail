@@ -112,6 +112,10 @@ const handleAgentClick = () => {
   selectedMailId.value = null
 }
 
+const handleAgentActionConfirmed = () => {
+  void mailStore.refreshCurrent()
+}
+
 </script>
 
 <template>
@@ -148,7 +152,7 @@ const handleAgentClick = () => {
           :scope="selectedMailId ? 'CURRENT_MAIL' : 'GLOBAL'"
           :item-id="selectedItemId"
           :title="selectedMailId ? '当前邮件助手' : 'SmartMail 助手'"
-          @action-confirmed="mailStore.refreshCurrent()"
+          @action-confirmed="handleAgentActionConfirmed"
         />
       </aside>
     </div>
