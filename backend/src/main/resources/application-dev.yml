@@ -26,7 +26,7 @@ smartmail:
     token-ttl-seconds: 86400
   internal-token: smartmail-internal-dev-token
   ai:
-    enabled: false
+    enabled: true
     agent-base-url: http://localhost:8000
     plugin-token: smartmail-agent-plugin-dev-token
     timeout-seconds: 5
