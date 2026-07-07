@@ -1,5 +1,8 @@
 -- Development schema for the in-memory H2 profile. Persistent MySQL deployments
 -- must manage schema changes separately and keep spring.sql.init.mode=never.
+DROP TABLE IF EXISTS agent_pending_action;
+DROP TABLE IF EXISTS agent_message;
+DROP TABLE IF EXISTS agent_session;
 DROP TABLE IF EXISTS ai_analysis_task;
 DROP TABLE IF EXISTS mail_ai_result;
 DROP TABLE IF EXISTS mail_category_assignment;
@@ -31,6 +34,43 @@ CREATE TABLE user_setting (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+
+CREATE TABLE agent_session (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    scope VARCHAR(32) NOT NULL,
+    context_json TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE agent_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL,
+    user_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    content TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    tool_calls_json TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE agent_pending_action (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    action_id VARCHAR(128) NOT NULL UNIQUE,
+    session_id VARCHAR(64) NOT NULL,
+    user_id BIGINT NOT NULL,
+    type VARCHAR(40) NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    payload_json TEXT NOT NULL,
+    reason VARCHAR(500),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    execution VARCHAR(40) NOT NULL DEFAULT 'BACKEND_REQUIRED',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE mail_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     message_no VARCHAR(64) NOT NULL UNIQUE,
@@ -152,6 +192,10 @@ CREATE INDEX idx_category_user_name ON mail_category(user_id, name);
 CREATE INDEX idx_assignment_user_mail ON mail_category_assignment(user_id, mail_id);
 CREATE INDEX idx_assignment_category ON mail_category_assignment(category_id);
 CREATE UNIQUE INDEX idx_assignment_unique ON mail_category_assignment(user_id, mail_id, category_id);
+CREATE INDEX idx_agent_session_user ON agent_session(user_id, updated_at);
+CREATE INDEX idx_agent_message_session ON agent_message(session_id, user_id, id);
+CREATE INDEX idx_agent_action_session ON agent_pending_action(session_id, user_id, status);
 CREATE INDEX idx_analysis_task_pending ON ai_analysis_task(status, created_at);
 CREATE INDEX idx_analysis_task_item ON ai_analysis_task(item_id, user_id, status);
 CREATE INDEX idx_analysis_task_mail_user ON ai_analysis_task(mail_id, user_id);
+
