@@ -244,19 +244,27 @@ public class AgentSessionService {
             if (actionId == null || actionId.isBlank()) {
                 continue;
             }
-            AgentPendingAction action = new AgentPendingAction();
-            action.setActionId(actionId);
-            action.setSessionId(sessionId);
-            action.setUserId(userId);
+            AgentPendingAction action = actionMapper.findByActionIdAndUserId(actionId, userId);
+            boolean existing = action != null;
+            if (!existing) {
+                action = new AgentPendingAction();
+                action.setActionId(actionId);
+                action.setSessionId(sessionId);
+                action.setUserId(userId);
+                action.setCreatedAt(LocalDateTime.now());
+            }
             action.setType(stringValue(item.get("type"), "UNKNOWN"));
             action.setLabel(stringValue(item.get("label"), action.getType()));
             action.setPayloadJson(toJson(mapValue(item.get("payload"))));
             action.setReason(stringValue(item.get("reason"), ""));
             action.setStatus(stringValue(item.get("status"), "PENDING"));
             action.setExecution(stringValue(item.get("execution"), "BACKEND_REQUIRED"));
-            action.setCreatedAt(LocalDateTime.now());
             action.setUpdatedAt(LocalDateTime.now());
-            actionMapper.insert(action);
+            if (existing) {
+                actionMapper.updateById(action);
+            } else {
+                actionMapper.insert(action);
+            }
             responses.add(toPendingActionResponse(action));
         }
         return responses;
