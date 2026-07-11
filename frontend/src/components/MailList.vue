@@ -26,6 +26,16 @@ const handleToggleStar = async (mailId: string) => {
   }
 }
 
+const handleEmptyTrash = async () => {
+  if (!window.confirm('确定要清空回收站吗？此操作只会永久隐藏你自己的回收站邮件。')) return
+  try {
+    await mailStore.emptyTrash()
+    ElMessage.success('回收站已清空')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '清空回收站失败')
+  }
+}
+
 const rangeStart = computed(() => mailStore.total ? (mailStore.page - 1) * mailStore.pageSize + 1 : 0)
 const rangeEnd = computed(() => Math.min(mailStore.page * mailStore.pageSize, mailStore.total))
 const hasPrevious = computed(() => mailStore.page > 1)
@@ -66,6 +76,13 @@ const formatTime = (timestamp: number) => {
       <div class="header-left">
         <input type="checkbox" class="checkbox" />
         <button type="button" class="refresh-btn" :disabled="mailStore.isLoading" @click="mailStore.refreshCurrent()">🔄</button>
+        <button
+          v-if="mailStore.currentLabel === 'TRASH' && mailStore.mailItems.length > 0"
+          type="button"
+          class="empty-trash-btn"
+          :disabled="mailStore.isLoading"
+          @click="handleEmptyTrash"
+        >清空回收站</button>
       </div>
       <div class="header-right">
         <span class="pagination">{{ rangeStart }}-{{ rangeEnd }} / {{ mailStore.total }}</span>
@@ -207,6 +224,25 @@ const formatTime = (timestamp: number) => {
 .refresh-btn:disabled:hover {
   transform: none;
   background: transparent;
+}
+
+.empty-trash-btn {
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.empty-trash-btn:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.empty-trash-btn:disabled {
+  cursor: default;
+  opacity: .45;
 }
 
 .loading-state, .error-state { padding: 24px; text-align: center; color: rgba(55, 53, 47, 0.5); font-size: 13px; }

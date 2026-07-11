@@ -59,6 +59,11 @@ public class MailboxController {
         return ApiResponse.ok();
     }
 
+    @DeleteMapping("/trash")
+    public ApiResponse<Integer> emptyTrash() {
+        return ApiResponse.ok(mailboxService.emptyTrash());
+    }
+
     @GetMapping("/search")
     public ApiResponse<PageResponse<SearchResultResponse>> search(
             @RequestParam String keyword,

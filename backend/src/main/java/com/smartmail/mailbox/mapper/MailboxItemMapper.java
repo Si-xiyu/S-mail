@@ -243,6 +243,17 @@ public interface MailboxItemMapper extends BaseMapper<MailboxItem> {
     int softDeleteExpiredTrash(@Param("cutoff") LocalDateTime cutoff,
                                @Param("deletedAt") LocalDateTime deletedAt);
 
+    @Update("""
+            UPDATE mailbox_item
+            SET deleted_flag = TRUE,
+                updated_at = #{deletedAt}
+            WHERE user_id = #{userId}
+              AND folder = 'TRASH'
+              AND deleted_flag = FALSE
+            """)
+    int softDeleteUserTrash(@Param("userId") Long userId,
+                            @Param("deletedAt") LocalDateTime deletedAt);
+
     @Select("""
             <script>
             SELECT * FROM mailbox_item

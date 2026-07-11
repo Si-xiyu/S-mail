@@ -140,6 +140,15 @@ class MailboxServiceStateTransitionTest {
         verify(mailboxMapper).softDeleteExpiredTrash(eq(cutoff), any(LocalDateTime.class));
     }
 
+    @Test
+    void emptyTrashSoftDeletesOnlyCurrentUsersTrashThroughMapper() {
+        when(mailboxMapper.softDeleteUserTrash(eq(1L), any(LocalDateTime.class))).thenReturn(3);
+
+        assertThat(service.emptyTrash()).isEqualTo(3);
+
+        verify(mailboxMapper).softDeleteUserTrash(eq(1L), any(LocalDateTime.class));
+    }
+
     private MailboxItem item(Long id, String folder) {
         MailboxItem item = new MailboxItem();
         item.setId(id);

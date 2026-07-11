@@ -20,6 +20,8 @@ const sending = ref(false)
 const customLabels = computed(() => mailStore.labels.filter(label => /^\d+$/.test(label.id)))
 const isTrash = computed(() => detail.value?.folder === 'TRASH')
 const aiSummaryLines = computed(() => extractAiSummary(detail.value))
+const aiStatus = computed(() => extractAiStatus(detail.value))
+const showAiSummaryCard = computed(() => mailStore.aiEnabled && (aiSummaryLines.value.length > 0 || aiStatus.value !== 'DISABLED'))
 
 const extractAiSummary = (mail: MailDetail | null): string[] => {
   if (!mail?.aiResults?.length) return []
@@ -43,6 +45,23 @@ const extractAiSummary = (mail: MailDetail | null): string[] => {
     }
   }
   return []
+}
+
+const extractAiStatus = (mail: MailDetail | null): string => {
+  if (!mailStore.aiEnabled) return 'DISABLED'
+  if (!mail?.aiResults?.length) return 'PENDING'
+  return String(mail.aiResults[0].status || 'SUCCEEDED').toUpperCase()
+}
+
+const aiStatusText = (status: string): string => {
+  if (status === 'SUCCEEDED') return '已生成'
+  if (status === 'FAILED') return '生成失败'
+  return '生成中'
+}
+
+const aiEmptyText = (status: string): string => {
+  if (status === 'FAILED') return '本邮件摘要生成失败，不影响正文阅读。'
+  return '摘要正在生成或暂未生成，可稍后刷新查看。'
 }
 
 const load = async () => {
@@ -211,11 +230,15 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
         <time>{{ new Date(detail.sentAt).toLocaleString() }}</time>
       </div>
 
-      <section v-if="aiSummaryLines.length" class="ai-summary-card">
-        <div class="ai-summary-title">AI 总结</div>
-        <ul>
+      <section v-if="showAiSummaryCard" class="ai-summary-card">
+        <div class="ai-summary-title">
+          <span>AI 总结</span>
+          <small>{{ aiStatusText(aiStatus) }}</small>
+        </div>
+        <ul v-if="aiSummaryLines.length">
           <li v-for="line in aiSummaryLines" :key="line">{{ line }}</li>
         </ul>
+        <p v-else>{{ aiEmptyText(aiStatus) }}</p>
       </section>
       <section v-if="thread.length > 1" class="thread">
         <details v-for="message in thread" :key="message.mailId" :open="message.mailId === detail.mailId">
@@ -277,11 +300,15 @@ const downloadAttachment = async (attachmentId: number, fileName: string) => {
             <time>{{ new Date(detail.sentAt).toLocaleString() }}</time>
           </div>
 
-          <section v-if="aiSummaryLines.length" class="ai-summary-card">
-            <div class="ai-summary-title">AI 总结</div>
-            <ul>
+          <section v-if="showAiSummaryCard" class="ai-summary-card">
+            <div class="ai-summary-title">
+              <span>AI 总结</span>
+              <small>{{ aiStatusText(aiStatus) }}</small>
+            </div>
+            <ul v-if="aiSummaryLines.length">
               <li v-for="line in aiSummaryLines" :key="line">{{ line }}</li>
             </ul>
+            <p v-else>{{ aiEmptyText(aiStatus) }}</p>
           </section>
           <section v-if="thread.length > 1" class="thread">
             <details v-for="message in thread" :key="message.mailId" :open="message.mailId === detail.mailId">
@@ -377,9 +404,11 @@ h1 { margin: 0 0 20px; font-size: 22px; font-weight: 600; color: #37352f; line-h
 .meta time { color: rgba(55, 53, 47, 0.45); font-size: 11px; }
 .avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: #37352f; background: #f0efed; font-weight: 600; font-size: 13px; }
 .ai-summary-card { margin-top: 24px; padding: 14px 16px; border: 1px solid #dbeafe; border-radius: 8px; background: #eff6ff; color: #1e3a8a; }
-.ai-summary-title { margin-bottom: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; color: #2563eb; }
+.ai-summary-title { margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; color: #2563eb; }
+.ai-summary-title small { color: rgba(30, 58, 138, .58); font-weight: 400; letter-spacing: 0; }
 .ai-summary-card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .ai-summary-card li { line-height: 1.55; font-size: 13px; }
+.ai-summary-card p { margin: 0; color: rgba(30, 58, 138, .68); font-size: 13px; line-height: 1.55; }
 .body, .thread { margin-top: 28px; white-space: pre-wrap; line-height: 1.75; color: #37352f; font-size: 14px; }
 .inline-panel .body, .inline-panel .thread { margin-top: 24px; font-size: 13px; }
 .thread details { padding: 12px 0; border-bottom: 1px solid #f0efed; }

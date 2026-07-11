@@ -154,6 +154,11 @@ public class MailboxService {
         return mailboxMapper.softDeleteExpiredTrash(cutoff, LocalDateTime.now());
     }
 
+    public int emptyTrash() {
+        Long userId = UserContext.requireUserId();
+        return mailboxMapper.softDeleteUserTrash(userId, LocalDateTime.now());
+    }
+
     public void changeCategory(Long itemId, Long categoryId) {
         MailboxItem item = requireOwnedItem(itemId);
         categoryService.assignCategory(item.getMailId(), categoryId, "MANUAL");

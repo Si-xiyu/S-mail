@@ -156,6 +156,30 @@ class MailServiceSecurityAndThreadTest {
     }
 
     @Test
+    void sendCreatesAnalysisTaskOnlyForDeliveredRecipientMailboxItems() {
+        UserContext.set(new CurrentUser(1L, "sender@smail.com", "Sender"));
+        when(userMapper.findByEmail("alice@smail.com")).thenReturn(user(2L, "alice@smail.com"));
+        when(userMapper.findByEmail("missing@smail.com")).thenReturn(null);
+        doAnswer(invocation -> {
+            invocation.<MailMessage>getArgument(0).setId(500L);
+            return 1;
+        }).when(mailMapper).insert(any(MailMessage.class));
+        doAnswer(invocation -> {
+            MailboxItem item = invocation.getArgument(0);
+            item.setId("INBOX".equals(item.getFolder()) ? 700L : 600L);
+            return 1;
+        }).when(mailboxMapper).insert(any(MailboxItem.class));
+
+        var response = service.send(request(
+                List.of("alice@smail.com", "missing@smail.com"), List.of(), List.of(), null));
+
+        assertThat(response.delivery().delivered()).containsExactly("alice@smail.com");
+        assertThat(response.delivery().failed()).containsExactly("missing@smail.com");
+        verify(analysisService).createTask(700L, 500L, 2L);
+        verify(analysisService, org.mockito.Mockito.times(1)).createTask(anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
     void recipientDetailDoesNotExposeBccButSenderDetailDoes() {
         MailMessage mail = message(500L, null, null, LocalDateTime.now(), "Subject");
         mail.setSenderId(1L);

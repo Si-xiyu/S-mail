@@ -233,6 +233,19 @@ export async function deleteMail(itemId: number): Promise<void> {
 }
 
 /**
+ * 清空当前用户回收站。
+ */
+export async function emptyTrash(): Promise<number> {
+  const { data } = await http.delete<ApiResponse<number>>('/mailbox/trash')
+
+  if (data.code !== 0) {
+    throw new Error(data.message)
+  }
+
+  return data.data || 0
+}
+
+/**
  * 移动邮件到指定文件夹
  * @param itemId 邮箱项 ID
  * @param folder 目标文件夹

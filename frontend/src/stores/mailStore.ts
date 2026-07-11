@@ -444,6 +444,25 @@ export const useMailStore = defineStore('mail', () => {
   }
 
   /**
+   * 清空回收站。
+   */
+  const emptyTrash = async (): Promise<void> => {
+    error.value = null
+    try {
+      await apiClient.emptyTrash()
+      if (currentLabel.value === 'TRASH') {
+        mailboxItems.value = []
+        total.value = 0
+        page.value = 1
+      }
+      await refreshUnreadCounts()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '清空回收站失败'
+      throw err
+    }
+  }
+
+  /**
    * 移动邮件到指定文件夹
    */
   const moveMail = async (itemId: number, folder: string): Promise<void> => {
@@ -835,6 +854,7 @@ export const useMailStore = defineStore('mail', () => {
     starMail,
     deleteMail: deleteMailCompat,
     deleteMailByItemId: deleteMail,
+    emptyTrash,
     moveMail,
     changeCategory,
     changeCategoryByItemId,
