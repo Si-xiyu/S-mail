@@ -29,21 +29,38 @@ class ToolRouterTest(unittest.TestCase):
         self.assertEqual(response.tool_calls, [])
         self.assertEqual(response.pending_actions, [])
 
-    def test_global_uses_mock_rag_tool(self) -> None:
-        response = self.router.chat(
-            PluginChatRequest(
-                sessionId="s1",
-                userId=1,
-                scope="GLOBAL",
-                message="最近有哪些项目进度邮件？",
+    def test_global_no_backend_results_returns_plain_no_match_message(self) -> None:
+        with patch.object(self.router.backend_tools, "search_mail", return_value=ToolResult(ok=True, data=[])):
+            response = self.router.chat(
+                PluginChatRequest(
+                    sessionId="s1",
+                    userId=1,
+                    scope="GLOBAL",
+                    message="最近有哪些项目进度邮件？",
+                )
             )
-        )
 
         self.assertEqual(response.status, "SUCCEEDED")
-        self.assertIn("mock", response.answer.lower())
-        self.assertEqual(response.tool_calls[0].tool, "rag_tool")
-        self.assertEqual(response.tool_calls[0].source, "MOCK")
-        self.assertEqual(response.tool_calls[0].output["records"][0]["source"], "MOCK")
+        self.assertNotIn("mock", response.answer.lower())
+        self.assertIn("没有找到", response.answer)
+        self.assertEqual(response.tool_calls[0].tool, "mail_search_tool")
+        self.assertEqual(response.tool_calls[0].source, "BACKEND")
+
+    def test_global_identity_question_returns_assistant_intro_without_search(self) -> None:
+        with patch.object(self.router.backend_tools, "search_mail") as search_mail:
+            response = self.router.chat(
+                PluginChatRequest(
+                    sessionId="s1",
+                    userId=1,
+                    scope="GLOBAL",
+                    message="你是谁？",
+                )
+            )
+
+        self.assertEqual(response.status, "SUCCEEDED")
+        self.assertIn("SmartMail 邮箱助手", response.answer)
+        self.assertEqual(response.tool_calls, [])
+        search_mail.assert_not_called()
 
     def test_current_mail_write_request_becomes_pending_action(self) -> None:
         response = self.router.chat(

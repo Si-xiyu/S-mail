@@ -13,7 +13,6 @@ from app.schemas.plugin import (
     PluginChatResponse,
     ToolCallRecord,
 )
-from app.services.rag_tool import RagTool
 from app.tools.backend_tools import BackendToolClient, to_mail_context
 
 
@@ -30,7 +29,6 @@ ACTION_KEYWORDS: dict[str, tuple[str, dict[str, Any], str]] = {
 class ToolRouter:
     def __init__(self) -> None:
         self.backend_tools = BackendToolClient()
-        self.rag_tool = RagTool()
         self.chat_model = DeepSeekClient(feature="chat")
 
     def chat(self, request: PluginChatRequest) -> PluginChatResponse:
@@ -197,6 +195,13 @@ class ToolRouter:
     def _handle_global(self, request: PluginChatRequest) -> PluginChatResponse:
         action_type, payload, label = _detect_action(request.message)
         query = _extract_search_query(request.message)
+        if action_type is None and _is_assistant_identity_question(request.message):
+            return PluginChatResponse(
+                status="SUCCEEDED",
+                answer=_assistant_identity_answer(),
+                tool_calls=[],
+            )
+
         if self.chat_model.available():
             try:
                 query = self.chat_model.extract_search_query(request.message)
@@ -253,13 +258,26 @@ class ToolRouter:
                     pass
             return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
 
-        records, tool_call = self.rag_tool.search(query, request.context)
-        answer = (
-            "暂未从后端检索到相关邮件，当前返回 mock 示例结果。"
-            "完整邮箱问答将在接入 BM25 + 向量检索后提供。"
-            f"\n示例匹配: {', '.join(r.get('title') or r.get('subject') or 'unknown' for r in records)}。"
+        tool_call = ToolCallRecord(
+            tool="mail_search_tool",
+            status="SUCCEEDED" if search_result.ok else "FAILED",
+            input={"query": query, "limit": 10 if action_type else 5},
+            output={"records": [], "source": "BACKEND"},
+            source="BACKEND",
+            error=search_result.error,
         )
-        return PluginChatResponse(status="SUCCEEDED", answer=answer, tool_calls=[tool_call])
+        if action_type:
+            return PluginChatResponse(
+                status="SUCCEEDED",
+                answer=f"没有找到与「{query}」匹配的邮件，因此未生成待确认操作。",
+                tool_calls=[tool_call],
+                pending_actions=[],
+            )
+        return PluginChatResponse(
+            status="SUCCEEDED",
+            answer=f"没有找到与「{query}」匹配的邮件。你可以换一个关键词，或指定发件人、主题、正文中的词继续搜索。",
+            tool_calls=[tool_call],
+        )
 
 
 def _plugin_enabled(plugin_config: dict[str, Any]) -> bool:
@@ -301,6 +319,19 @@ def _detect_action(message: str) -> tuple[Any, dict[str, Any], str | None]:
 
     return None, {}, None
 
+
+def _is_assistant_identity_question(message: str) -> bool:
+    text = message.strip().lower()
+    compact = re.sub(r"\s+", "", text)
+    return any(token in compact for token in ("你是谁", "你能做什么", "你可以做什么", "介绍一下你", "whatareyou", "whoareyou"))
+
+
+def _assistant_identity_answer() -> str:
+    return (
+        "我是 SmartMail 邮箱助手，可以帮你阅读当前邮件、总结邮件内容、搜索邮箱里的邮件，"
+        "也可以在你确认后执行删除、移入 Junk、标记已读、设置分类等操作。"
+        "基础邮件功能由后端提供；AI 功能关闭时，邮箱本体仍可正常使用。"
+    )
 
 def _extract_search_query(message: str) -> str:
     text = message.strip()

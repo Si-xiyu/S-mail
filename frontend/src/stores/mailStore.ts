@@ -690,6 +690,21 @@ export const useMailStore = defineStore('mail', () => {
   /**
    * 将邮件添加到分类
    */
+  const changeCategoryByItemId = async (itemId: number, categoryId: string | number): Promise<void> => {
+    error.value = null
+    try {
+      const catId = typeof categoryId === 'number' ? categoryId : parseInt(categoryId, 10)
+      if (Number.isNaN(catId)) {
+        throw new Error('无效的分类 ID')
+      }
+      await apiClient.changeCategory(itemId, catId)
+      void refreshUnreadCounts()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '添加到分类失败'
+      throw err
+    }
+  }
+
   const changeCategory = async (id: string, categoryId: string): Promise<void> => {
     error.value = null
     try {
@@ -697,8 +712,7 @@ export const useMailStore = defineStore('mail', () => {
       const catId = parseInt(categoryId, 10)
       const item = mailboxItems.value.find(m => m.mailId === mailId)
       if (item) {
-        await apiClient.changeCategory(item.itemId, catId)
-        void refreshUnreadCounts()
+        await changeCategoryByItemId(item.itemId, catId)
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '添加到分类失败'
@@ -820,8 +834,10 @@ export const useMailStore = defineStore('mail', () => {
     markMailRead,
     starMail,
     deleteMail: deleteMailCompat,
+    deleteMailByItemId: deleteMail,
     moveMail,
     changeCategory,
+    changeCategoryByItemId,
     selectLabel,
     addLabel,
     deleteLabel,

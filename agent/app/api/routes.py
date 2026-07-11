@@ -30,8 +30,9 @@ tool_router = ToolRouter()
 
 def _select_analysis_provider(request: AnalysisRequest) -> RulesAnalysisProvider | DeepSeekAnalysisProvider:
     provider = str(request.plugin_config.provider or settings.provider or "RULES").upper()
-    llm_enabled = bool(request.plugin_config.llm_enabled and request.plugin_config.api_key)
-    if provider == "DEEPSEEK" or llm_enabled:
+    effective_api_key = request.plugin_config.api_key or settings.api_key_for("analysis")
+    llm_enabled = bool(request.plugin_config.llm_enabled and effective_api_key)
+    if provider == "DEEPSEEK" and llm_enabled:
         return deepseek_analysis_provider
     return rules_analysis_provider
 

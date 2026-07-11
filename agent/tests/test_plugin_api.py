@@ -218,7 +218,7 @@ class PluginApiTests(unittest.TestCase):
         self.assertEqual(body["toolCalls"][0]["source"], "BACKEND")
         self.assertEqual(body["pendingActions"], [])
 
-    def test_agent_chat_global_uses_mock_rag(self) -> None:
+    def test_agent_chat_global_no_results_avoids_mock_rag_message(self) -> None:
         response = self.client.post(
             "/plugin/v1/agent/chat",
             headers=PLUGIN_HEADERS,
@@ -233,9 +233,27 @@ class PluginApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["status"], "SUCCEEDED")
-        self.assertIn("mock", body["answer"].lower())
-        self.assertEqual(body["toolCalls"][0]["tool"], "rag_tool")
-        self.assertEqual(body["toolCalls"][0]["source"], "MOCK")
+        self.assertNotIn("mock", body["answer"].lower())
+        self.assertEqual(body["toolCalls"][0]["tool"], "mail_search_tool")
+        self.assertEqual(body["toolCalls"][0]["source"], "BACKEND")
+
+    def test_agent_chat_global_identity_question_returns_intro(self) -> None:
+        response = self.client.post(
+            "/plugin/v1/agent/chat",
+            headers=PLUGIN_HEADERS,
+            json={
+                "sessionId": "s1",
+                "userId": 1,
+                "scope": "GLOBAL",
+                "message": "你是谁？",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "SUCCEEDED")
+        self.assertIn("SmartMail 邮箱助手", body["answer"])
+        self.assertEqual(body["toolCalls"], [])
 
     def test_agent_chat_write_intent_returns_pending_action_contract(self) -> None:
         response = self.client.post(
